@@ -16,8 +16,10 @@ that behavior. The user interface is new (larger graphics) and multiplayer runs 
 - **Turn style:** one player at a time, live, alternating, as in the original.
 - **Quirks and bugs:** each one is logged and reviewed individually before deciding whether
   to reproduce or fix it.
-- **Verification:** the game is deterministic from its starting seed, so the new engine is
-  checked against the original running in Basilisk II, move for move.
+- **Verification:** the new engine is checked against the original. Map generation follows
+  from the game seed; combat and computer-opponent randomness is reseeded from the Mac clock
+  each day, so exact comparisons need a controlled clock or the original routines run
+  directly in a CPU emulator (see [docs/findings.md](docs/findings.md#randomness)).
 
 ## Layout
 
@@ -27,7 +29,8 @@ that behavior. The user interface is new (larger graphics) and multiplayer runs 
 | `docs/save-format.md` | Save-file structure, as mapped so far |
 | `docs/versions.md` | 2.055 vs 3.01 comparison |
 | `docs/quirks.md` | Bugs, exploits and version differences awaiting a reproduce/fix decision |
-| `tools/analysis/` | Resource-fork, disassembly and comparison scripts |
+| `tools/analysis/` | Resource-fork, disassembly, cross-reference and comparison scripts |
+| `tools/save/sc3save.py` | Save-file reader: text dump and map rendering |
 | `tools/extract.sh` | Unpacks the game archive into `build/sc301.rsrc` |
 | `emulator/` | Headless Basilisk II setup and control scripts |
 | `saves/3.01/` | Saved games produced in the emulator, with descriptions |
@@ -49,6 +52,8 @@ Place these in `originals/` before running the tools or emulator:
 pip install --break-system-packages -r tools/requirements.txt
 tools/extract.sh                                   # writes build/sc301.rsrc
 python3 -I tools/analysis/codeinfo.py build/sc301.rsrc
+python3 -I tools/save/sc3save.py dump saves/3.01/s04-day58-autoplay.sav
+python3 -I tools/save/sc3save.py render saves/3.01/s04-day58-autoplay.sav build/day58.png --player 1
 emulator/setup.sh                                  # boots System 7.5.3 headless with the game installed
 ```
 

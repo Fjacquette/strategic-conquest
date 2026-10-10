@@ -59,8 +59,23 @@ Total ~147 KB of code, ~450 functions, ~47,000 instructions.
 ## Randomness
 
 The game uses two generators. At new-game time both are seeded from the same 32-bit value,
-global `A5-$1E70` (`CODE 2 + 0x1D10` and `+ 0x1D16`). Given that seed and the sequence of
-player moves, a game should replay exactly.
+the game seed in global `A5-$1E70` (`CODE 2 + 0x1D10` and `+ 0x1D16`), which is also the
+first field of a save file.
+
+**The game is not replayable from that seed alone.** At the end of every day, the main day
+loop (`CODE 1 + 0x195C`, which increments the day counter, through `CODE 1 + 0x1F86`)
+overwrites the game PRNG's seed with the Macintosh clock in seconds (`_ReadDateTime` via
+glue at `CODE 1 + 0x39AC`, called at `CODE 1 + 0x1F74`). So:
+
+- Map generation, which uses QuickDraw `Random`, follows from the game seed.
+- Combat and computer-opponent randomness on day 1 follows from the game seed; from then
+  on, each day starts from that moment's clock reading.
+- Neither generator's current state is saved, so a resumed game does not continue the
+  original random sequence.
+
+Exact verification of combat and the computer opponent therefore needs a controlled clock:
+the emulator's host clock (for example with libfaketime), or running the game's routines
+directly in a CPU emulator with a chosen seed.
 
 ### 1. QuickDraw `Random` (trap `A861`)
 
@@ -85,20 +100,24 @@ player moves, a game should replay exactly.
 
 - The masking leaves 15 bits of effective state; the period is 16,384 calls.
 - 8 call sites: battle ×3, machine ×4, tools ×1.
-- `CODE 1 + 0x1F76` passes the seed's address to the routine at `CODE 1 + 0x39AC`; its
-  purpose (save/load or network synchronization) is not yet identified.
+- Reseeded from the clock at the end of every day, as described above.
 
-### Turn-dependent random check in Mover
+### Day-dependent random check in Mover
 
 Routine at `CODE 5 + 0x23C4` (not in the jump table, so called only from within Mover) returns
-a Boolean based on an unidentified 16-bit global `g` at `A5-$2D08`:
+a Boolean based on the day number (`A5-$2D08`):
 
-- `g < 30`: always TRUE.
-- `30 ≤ g < 60`: FALSE with probability d/16, where d = (g − 30) div 6 + 1 (1/16 up to 5/16).
-- `g ≥ 60`: FALSE with probability 6/16.
+- Day < 30: always TRUE.
+- Days 30–59: FALSE with probability d/16, where d = (day − 30) div 6 + 1 (1/16 up to 5/16).
+- Day ≥ 60: FALSE with probability 6/16.
 
 The random draw is `(Random & 0x7FFF) mod 16`, using QuickDraw `Random`. What the routine
-gates, and whether `g` is the day number, are not yet known.
+gates is not yet known.
+
+### Other day-loop behavior noted
+
+- At `CODE 1 + 0x199A`, something happens on every third day after day 20
+  (`day mod 3 = 0 and day > 20`). Not yet identified.
 
 ## Resources
 
@@ -117,7 +136,9 @@ gates, and whether `g` is the day number, are not yet known.
 
 ## Unit types (3.01)
 
-Army, Fighter, Destroyer, Submarine, Transport, Carrier, Battleship, Bomber.
+Army, Fighter, Destroyer, Submarine, Transport, Carrier, Battleship, Bomber (the order of the
+STR list and the production dialog). The internal type codes swap Transport and Carrier; see
+[save-format.md](save-format.md#pieces-offset-2408-6314-bytes).
 
 Production time in days, from the in-game production dialog:
 
@@ -128,10 +149,17 @@ Production time in days, from the in-game production dialog:
 Observed: a new Army has 1 move per day and strength 1. A Transport observed mid-game
 showed 3 moves remaining, strength 3, and 6 Armies on board.
 
+## Map
+
+80 columns × 60 rows including a one-cell edge, so the playable area is 78 × 58. 45 cities.
+Layout details are in [save-format.md](save-format.md).
+
 ## Observed in emulation
 
 - Setup dialog choices: Single Player Game, 2 Player Single Mac Game, AppleTalk Master,
   AppleTalk Slave; skill level slider.
-- The map grid shows columns 1–61 and rows 1–54 in the unscrolled 1024×768 window; the full
-  map size is not yet known.
-- Save is deferred to the end of the round.
+- The 1024×768 window shows 61 columns and 54 rows of the map at a time.
+- Save and Resume Game are both deferred to the end of the day. The Resume Game prompt reads
+  "A new game will be created after this day has completed."
+- Auto Play state is stored in the save, so a game saved during Auto Play resumes in
+  Auto Play.

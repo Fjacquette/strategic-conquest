@@ -1,40 +1,138 @@
 # Save-file format (3.01)
 
-Status: early. Only what the first diffs show is recorded here; everything marked
-*hypothesis* still needs confirming.
+Status: block layout confirmed from the code; main records decoded; some fields still unknown.
+`tools/save/sc3save.py` implements everything here.
+
+**Verification.** `saves/3.01/s04-day58-autoplay.sav` was loaded in the emulator and the
+screen compared with the parser's rendering of the human player's view, columns 8–68,
+rows 1–54 (left: emulator, right: parser). Terrain, explored area, city positions, and the
+position and type of every piece shown on screen match. The computer's pieces outside the
+human player's current sight appear only on the right, because the game hides them.
+
+![Emulator vs parser, day 58](img/save-verify-day58.png)
 
 ## General
 
-- Fixed size: 11,381 bytes, data fork only.
-- Mac type `SC∂ `, creator `SCÆ `.
-- Written only at the end of a round (after the computer's move).
+- 11,381 bytes, data fork only. Mac type `SC∂ `, creator `SCÆ `.
+- Written only at the end of a round. Loading is also deferred to the end of the round.
+- The file is a straight dump of 23 global variables: the save routine (Gstart,
+  `CODE 10 + 0x0542..0x07FA`) writes them with FSWrite, and the load routine (Main,
+  `CODE 1 + 0x0A9A..0x0DD2`) reads them back in the same order.
+- Not saved: the current state of either random generator (see
+  [findings.md](findings.md#randomness)), and the island-number map at `A5-$3672`
+  (80×60 nibbles), which must be rebuilt after loading.
 
-## Header
+## Coordinates
 
-| Offset | Size | Value in saves | Meaning |
-|---|---|---|---|
-| 0 | 6 | `E6 F0 01 66 00 01` in all four saves | Unknown (constant so far) |
-| 6 | 2 | 5, 6, 57, 58 | Day number of the next turn (word; low byte at offset 7) |
+- 1-based: x (column) 1–80, y (row) 1–60. The outer ring is the map edge (terrain 5), so
+  the playable area is x 2–79, y 2–59.
+- The column and row labels on the game screen are these coordinates.
+- Records store positions as byte pairs in **(y, x)** order.
 
-## Diff: `s01-day4` → `s02-day5-army-east`
+## Blocks
 
-Between these saves the human Army moved one square east from the city at column 38,
-row 28; the computer also took its turn.
+| File offset | Size | Global | Name | Contents |
+|---|---|---|---|---|
+| 0 | 4 | A5-$1E70 | seed | Starting seed for the game (constant within a game) |
+| 4 | 1 | A5-$1E71 | game_mode | 0 = single player. The setup dialog sets 1, 2 or 3 for the other choices; mapping not yet confirmed |
+| 5 | 1 | A5-$2CE6 | skill | Skill level |
+| 6 | 2 | A5-$2D08 | day | Day number (incremented at the top of the main day loop, `CODE 1 + 0x195C`) |
+| 8 | 2400 | A5-$27D2 | terrain | Map, see below |
+| 2408 | 6314 | A5-$5138 | pieces | Piece table, see below |
+| 8722 | 1284 | A5-$2CD8 | player_maps | Two per-player structures, see below |
+| 10006 | 1 | A5-$1E71 | game_mode_2 | Same variable as offset 4, written again |
+| 10007 | 460 | A5-$385E | cities | City table, see below |
+| 10467 | 2 | A5-$388E | piece_count | Highest piece slot in use |
+| 10469 | 352 | A5-$1BFC | cur_islands | Per-island records for the player whose turn it is, see below |
+| 10821 | 352 | A5-$0F86 | oth_islands | Same, for the other player |
+| 11173 | 32 | A5-$1C4E | cur_1C4E | Current player: 16 words, one per island (cleared per island at setup). Meaning unknown |
+| 11205 | 32 | A5-$0CBC | oth_0CBC | Other player's copy |
+| 11237 | 46 | A5-$1C8C | cur_1C8C | Current player: 46 bytes (possibly one per city, 0–45). Meaning unknown |
+| 11283 | 46 | A5-$0C7C | oth_0C7C | Other player's copy |
+| 11329 | 16 | A5-$1C5E | cur_1C5E | Current player: 16 bytes (possibly one per island). Meaning unknown |
+| 11345 | 16 | A5-$0C20 | oth_0C20 | Other player's copy |
+| 11361 | 2 | A5-$1C02 | cur_1C02 | Current player word. Meaning unknown |
+| 11363 | 2 | A5-$0CC6 | oth_0CC6 | Other player's copy |
+| 11365 | 2 | A5-$1C2E | cur_1C2E | Current player word. Meaning unknown |
+| 11367 | 2 | A5-$0CC0 | oth_0CC0 | Other player's copy |
+| 11369 | 12 | A5-$2CE4 | blk_2CE4 | Unknown; zero in all saves so far |
 
-| Offset | s01 | s02 | Interpretation |
-|---|---|---|---|
-| 7 | `05` | `06` | Day number |
-| 2425–2433 | `26 1C 26 1C 26 00 22 10 44` | `27 1C 27 1C 27 00 22 10 14` | Army record: column 0x26→0x27 (38→39), row 0x1C (28), stored twice; the column appears a third time |
-| 9037 | `00` | `1C` | Unknown |
-| 10022 | `04` | `03` | *Hypothesis:* production countdown |
-| 10102 | `02` | `01` | *Hypothesis:* production countdown |
-| 10512 + 22·k, k = 0..14 | `04` (one `03`) | `05` (one `04`) | 15 records of 22 bytes, each with a counter incremented by 1 |
+**Current vs other player.** The game keeps one set of "current player" variables and a
+stored copy for the other player, and swaps them when the turn changes
+(`CODE 1 + 0x2C8C..0x2D6C`). The `cur_`/`oth_` blocks are those two sets as they stood
+when the save was written.
 
-Bytes 8 onward begin with long runs of `0x55`, then values such as `0x35`, `0x33`,
-`0x00`. *Hypothesis:* map data.
+## Terrain (offset 8, 2400 bytes)
 
-## Next steps
+- 4 bits per cell, column-major: cell (x, y) is nibble number (x − 1)·60 + (y − 1).
+  Even-numbered nibbles are the low half of the byte.
+- Values: 0 water, 3 land, 5 map edge.
+- City cells hold 1 << owner: **1** neutral, **2** player 1, **4** player 2. They change when
+  a city is captured.
 
-- Locate the read/write routines (`_Write`/`_Read` call sites in Gstart and Main) and read
-  the structure layout directly from the code, rather than only from diffs.
-- Use the mid-game saves (day 57, day 58) to confirm the map encoding against screenshots.
+## Pieces (offset 2408, 6314 bytes)
+
+451 records of 14 bytes. Record 0 is unused; records 1..`piece_count` are live unless their
+type is 9 (empty slot). The table holds at most 450 pieces.
+
+| Byte | Meaning |
+|---|---|
+| 0–1 | (y, x) point A. Often the city that built the piece; not yet confirmed |
+| 2–3 | (y, x) point B. Unknown |
+| 4–5 | (y, x) point C. Unknown; possibly a destination |
+| 6–7 | (y, x) current position |
+| 8–9 | Big-endian word. Bits 5–9: fuel (Fighter, Bomber) or cargo count (Transport, Carrier). Other bits unknown |
+| 10 | Bits 0–3 type, bits 4–5 owner (1 or 2), bits 6–7 unknown |
+| 11 | Unknown |
+| 12 | Bits 0–4 strength, bits 5–7 unknown |
+| 13 | Unknown |
+
+Type codes (a lookup table in EMPINIT, `CODE 2 + 0x2D0E`, maps them to the STR names):
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|
+| Army | Fighter | Destroyer | Submarine | Carrier | Transport | Battleship | Bomber | "removed" | empty |
+
+Note that Carrier (4) and Transport (5) are in the opposite order from the STR list and the
+production dialog.
+
+Moves remaining are not stored in the record; the status-line routine (`CODE 5 + 0x5450`)
+receives them from its caller.
+
+## Player maps (offset 8722, 1284 bytes)
+
+Two 642-byte structures, player 1 then player 2.
+
+| Bytes | Meaning |
+|---|---|
+| 0–639 | Explored-cells bitmap: 8 bytes per column, column x at (x − 1)·8; cell (x, y) is bit (y − 1), least significant bit first |
+| 640 | 1 if the computer controls this player. Player 2 is always 1 in single-player games; player 1 is 1 while Auto Play is on, so Auto Play resumes when the save is loaded |
+| 641 | Unknown (0 so far) |
+
+## Cities (offset 10007, 460 bytes)
+
+46 records of 10 bytes. Record 0 is unused; 45 cities (records 1–45).
+
+| Byte | Meaning |
+|---|---|
+| 0–1 | (y, x) position |
+| 2–3 | (y, x). Equal to the position in every save so far; possibly the city's Army destination ("CAD" in the production dialog) |
+| 4 | Owner: 0 neutral, 1 player 1, 2 player 2 |
+| 5 | Days until the current unit is complete |
+| 6–7 | (y, x). Equal to the position in every save so far; possibly the aircraft destination ("CAAD") |
+| 8 | Piece type in production (codes above) |
+| 9 | Island number (1–15) |
+
+## Per-island records (offsets 10469 and 10821, 352 bytes each)
+
+16 records of 22 bytes, indexed by island number (0 = no island). The computer-opponent code
+indexes them by the island-number map (`CODE 6 + 0x0364` tests bit 6 of byte 15). Byte 21
+of records 1–15 holds a day number, the current day or earlier. Other fields not yet decoded.
+
+## Open
+
+- Piece bytes 0–5, 11, 13, and the unknown bits of bytes 8–10 and 12.
+- City bytes 2–3 and 6–7 when a destination is set.
+- Game-mode values 1–3.
+- The per-island records and the small current/other-player blocks (computer-opponent
+  bookkeeping).
