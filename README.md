@@ -29,8 +29,11 @@ that behavior. The user interface is new (larger graphics) and multiplayer runs 
 | `docs/save-format.md` | Save-file structure, as mapped so far |
 | `docs/versions.md` | 2.055 vs 3.01 comparison |
 | `docs/quirks.md` | Bugs, exploits and version differences awaiting a reproduce/fix decision |
+| `docs/rules/` | Game rules recovered from the code, one file per subsystem |
 | `tools/analysis/` | Resource-fork, disassembly, cross-reference and comparison scripts |
 | `tools/save/sc3save.py` | Save-file reader: text dump and map rendering |
+| `tools/model/` | Python reference models of the original rules |
+| `tools/emu/` | Harness that runs the original routines on an emulated 68040, and differential tests against the models |
 | `tools/extract.sh` | Unpacks the game archive into `build/sc301.rsrc` |
 | `emulator/` | Headless Basilisk II setup and control scripts |
 | `saves/3.01/` | Saved games produced in the emulator, with descriptions |
@@ -51,6 +54,7 @@ Place these in `originals/` before running the tools or emulator:
 ```bash
 pip install --break-system-packages -r tools/requirements.txt
 tools/extract.sh                                   # writes build/sc301.rsrc
+python3 -I tools/emu/test_combat.py 3000          # original combat code vs the Python model
 python3 -I tools/analysis/codeinfo.py build/sc301.rsrc
 python3 -I tools/save/sc3save.py dump saves/3.01/s04-day58-autoplay.sav
 python3 -I tools/save/sc3save.py render saves/3.01/s04-day58-autoplay.sav build/day58.png --player 1

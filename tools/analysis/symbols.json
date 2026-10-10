@@ -1,0 +1,149 @@
+{
+  "globals": {
+    "-0x55C2": [
+      "combat_table",
+      48
+    ],
+    "-0x5592": [
+      "piece_hash",
+      1104
+    ],
+    "-0x5138": [
+      "pieces",
+      6314
+    ],
+    "-0x388E": [
+      "piece_count",
+      2
+    ],
+    "-0x385E": [
+      "cities",
+      460
+    ],
+    "-0x3672": [
+      "island_map",
+      2400
+    ],
+    "-0x2D08": [
+      "day",
+      2
+    ],
+    "-0x2CE6": [
+      "skill",
+      1
+    ],
+    "-0x2CD8": [
+      "player_maps",
+      1284
+    ],
+    "-0x27D2": [
+      "terrain",
+      2400
+    ],
+    "-0x1E71": [
+      "game_mode",
+      1
+    ],
+    "-0x1E70": [
+      "game_seed",
+      4
+    ],
+    "-0x1E4F": [
+      "city_count",
+      1
+    ],
+    "-0x1C8C": [
+      "cur_1C8C",
+      46
+    ],
+    "-0x1C5E": [
+      "cur_1C5E",
+      16
+    ],
+    "-0x1C4E": [
+      "cur_1C4E",
+      32
+    ],
+    "-0x1C2E": [
+      "cur_1C2E",
+      2
+    ],
+    "-0x1C02": [
+      "cur_1C02",
+      2
+    ],
+    "-0x1BFC": [
+      "cur_islands",
+      352
+    ],
+    "-0x1386": [
+      "battle_report_list",
+      4
+    ],
+    "-0x1324": [
+      "type_str_ids",
+      20
+    ],
+    "-0x127C": [
+      "prng_seed",
+      4
+    ],
+    "-0x0F86": [
+      "oth_islands",
+      352
+    ],
+    "-0x0CC6": [
+      "oth_0CC6",
+      2
+    ],
+    "-0x0CC0": [
+      "oth_0CC0",
+      2
+    ],
+    "-0x0CBC": [
+      "oth_0CBC",
+      32
+    ],
+    "-0x0C7C": [
+      "oth_0C7C",
+      46
+    ],
+    "-0x0C20": [
+      "oth_0C20",
+      16
+    ],
+    "-0x023A": [
+      "qd_randSeed",
+      4
+    ],
+    "-0x01BC": [
+      "qd_thePort",
+      4
+    ]
+  },
+  "functions": {
+    "1:0x2140": "AttackAndReport",
+    "1:0x2AFA": "GameRandom",
+    "1:0x39AC": "ReadDateTime",
+    "1:0x3A62": "FSRead",
+    "1:0x3A66": "FSWrite",
+    "1:0x4BC6": "rt_mul32",
+    "1:0x4BFA": "rt_div32",
+    "1:0x4C20": "rt_mod32",
+    "1:0x4C46": "rt_divmod32_core",
+    "2:0x0004": "InitCombatTable",
+    "3:0x0004": "ResolveCombat",
+    "3:0x0332": "KillKeepOwner",
+    "3:0x0374": "KillStack",
+    "3:0x0492": "ApplyDamage",
+    "3:0x0520": "Attack",
+    "3:0x0A30": "BomberBlast",
+    "4:0x026C": "PieceHashRemove",
+    "4:0x0E62": "KillTypesAt",
+    "4:0x1110": "IsWeakened",
+    "4:0x27EE": "KillPiece",
+    "4:0x286E": "TypeStrId",
+    "4:0x28A8": "Distance",
+    "5:0x23C4": "DayRandomCheck"
+  }
+}
