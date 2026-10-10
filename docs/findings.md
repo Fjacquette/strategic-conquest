@@ -1,7 +1,7 @@
 # Findings: Strategic Conquest 3.01 binary
 
 Offsets are given as `CODE n + 0xXXXX`, counted from the start of the CODE resource
-(including its 4-byte segment header), which is what `tools/analysis/dis.py` expects.
+(including its 4-byte segment header), which is what `tools/analysis/disasm.py` expects.
 Globals are given as A5-relative offsets.
 
 ## The file
@@ -118,6 +118,22 @@ gates is not yet known.
 
 - At `CODE 1 + 0x199A`, something happens on every third day after day 20
   (`day mod 3 = 0 and day > 20`). Not yet identified.
+
+## Loading a saved game
+
+The load routine (`CODE 1 + 0x0A9A..0x0E60`) reads the game seed, then calls the new-game
+setup (`CODE 2 + 0x1CDC`), which **regenerates the world from that seed** and reseeds both
+random generators with it, before reading the rest of the file over the top. It then
+rebuilds per-island data (`CODE 2 + 0x24DE`) and compacts the piece table, which also
+rebuilds the position hash (`CODE 4 + 0x259A`). So after loading, the random generators
+are back at their starting state.
+
+## Map generation uses QuickDraw regions
+
+Map generation (`CODE 2 + 0x179C` and the setup around it) builds island shapes with
+QuickDraw region and polygon calls (`OpenRgn`/`LineTo`/`CloseRgn`, `UnionRgn`, `EmptyRgn`,
+`OpenPoly`). Reproducing the original maps exactly would require reproducing QuickDraw's
+region rules. Not yet investigated further.
 
 ## Resources
 

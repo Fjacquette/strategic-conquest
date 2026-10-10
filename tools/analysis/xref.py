@@ -1,7 +1,7 @@
 """Find call sites of a routine, both through the jump table and PC-relative within its segment.
 
 Usage: python3 -I xref.py <resource-fork-file> <segment> <offset>
-<offset> is the routine's offset within the CODE resource (as printed by dis.py).
+<offset> is the routine's offset within the CODE resource (as printed by disasm.py and adis.py).
 """
 import sys, struct, rsrcfork
 

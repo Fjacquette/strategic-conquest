@@ -1,8 +1,9 @@
 # Saved games: Strategic Conquest 3.01
 
-All from one single-player game at skill level 1, played in the emulator. The first city
-produces Armies. Saves are written at the end of a round, after the computer's move, so
-each file records the start of the day shown.
+`s01`–`s04` come from one single-player game at skill level 1; `s05` from a separate
+two-player game. All were played in the emulator, with the first city producing Armies.
+Saves are written at the end of a round, after both sides have moved, so each file records
+the start of the day shown.
 
 | File | Day | State |
 |---|---|---|
