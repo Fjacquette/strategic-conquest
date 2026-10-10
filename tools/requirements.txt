@@ -1,0 +1,2 @@
+rsrcfork==1.8.0
+capstone==5.0.7

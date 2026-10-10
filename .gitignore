@@ -1,0 +1,9 @@
+originals/*
+!originals/README.md
+build/
+__pycache__/
+*.pyc
+*.ROM
+*.rom
+*.image
+*.rsrc
