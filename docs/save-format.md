@@ -34,7 +34,7 @@ human player's current sight appear only on the right, because the game hides th
 | File offset | Size | Global | Name | Contents |
 |---|---|---|---|---|
 | 0 | 4 | A5-$1E70 | seed | Starting seed for the game (constant within a game) |
-| 4 | 1 | A5-$1E71 | game_mode | 0 = single player. The setup dialog sets 1, 2 or 3 for the other choices; mapping not yet confirmed |
+| 4 | 1 | A5-$1E71 | game_mode | 0 single player, 1 two players on one Mac, 2 AppleTalk Master, 3 AppleTalk Slave (see [rules/units.md](rules/units.md)) |
 | 5 | 1 | A5-$2CE6 | skill | Skill level |
 | 6 | 2 | A5-$2D08 | day | Day number (incremented at the top of the main day loop, `CODE 1 + 0x195C`) |
 | 8 | 2400 | A5-$27D2 | terrain | Map, see below |
@@ -77,15 +77,15 @@ type is 9 (empty slot). The table holds at most 450 pieces.
 
 | Byte | Meaning |
 |---|---|
-| 0–1 | (y, x) point A. Often the city that built the piece; not yet confirmed |
-| 2–3 | (y, x) point B. Unknown |
-| 4–5 | (y, x) point C. Unknown; possibly a destination |
+| 0–1 | (y, x) point A. Set to the build position; later use not yet decoded |
+| 2–3 | (y, x) point B: destination when the piece has go-to orders (a new piece copies its city's Army destination here) |
+| 4–5 | (y, x) point C. Set to the build position; later use not yet decoded |
 | 6–7 | (y, x) current position |
-| 8–9 | Big-endian word. Bits 5–9: fuel (Fighter, Bomber) or cargo count (Transport, Carrier). Other bits unknown |
+| 8–9 | Big-endian word. Bits 0–4: current move step within the day (1-based). Bits 5–9: fuel (Fighter, Bomber) or cargo count (Transport, Carrier). Bits 10–15: Bomber blast radius |
 | 10 | Bits 0–3 type, bits 4–5 owner (1 or 2), bits 6–7 unknown |
-| 11 | Unknown |
-| 12 | Bits 0–4 strength, bits 5–7 unknown |
-| 13 | Unknown |
+| 11 | Bit 2: has moved this day. Bits 3–4: orders (2 = go to destination). Bits 6–7: state (1 when built; 2 while awaiting repair, reset to 1 when fully repaired). Bits 0, 1 and 5 not yet decoded |
+| 12 | Bits 0–4 strength. Bits 6–7: spotted (set on a Submarine found by a Destroyer; 0 means it strikes first when attacked, see [combat](rules/combat.md)). Bit 5 unknown |
+| 13 | 1 once a ship has been repaired during its current stay in port |
 
 Type codes (a lookup table in EMPINIT, `CODE 2 + 0x2D0E`, maps them to the STR names):
 
@@ -131,8 +131,7 @@ of records 1–15 holds a day number, the current day or earlier. Other fields n
 
 ## Open
 
-- Piece bytes 0–5, 11, 13, and the unknown bits of bytes 8–10 and 12.
+- Piece points A and C after the piece has moved; the undecoded bits of bytes 10–12.
 - City bytes 2–3 and 6–7 when a destination is set.
-- Game-mode values 1–3.
 - The per-island records and the small current/other-player blocks (computer-opponent
   bookkeeping).

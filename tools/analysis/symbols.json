@@ -24,6 +24,14 @@
       "island_map",
       2400
     ],
+    "-0x2D10": [
+      "move_step",
+      2
+    ],
+    "-0x2D0A": [
+      "local_player",
+      1
+    ],
     "-0x2D08": [
       "day",
       2
@@ -84,9 +92,21 @@
       "type_str_ids",
       20
     ],
+    "-0x1284": [
+      "own_city_code",
+      3
+    ],
+    "-0x1280": [
+      "opponent_of",
+      3
+    ],
     "-0x127C": [
       "prng_seed",
       4
+    ],
+    "-0x1277": [
+      "init_done_flag",
+      1
     ],
     "-0x0F86": [
       "oth_islands",
@@ -122,6 +142,8 @@
     ]
   },
   "functions": {
+    "1:0x021C": "ProductionDays",
+    "1:0x0364": "CityProductionTick",
     "1:0x2140": "AttackAndReport",
     "1:0x2AFA": "GameRandom",
     "1:0x39AC": "ReadDateTime",
@@ -132,6 +154,7 @@
     "1:0x4C20": "rt_mod32",
     "1:0x4C46": "rt_divmod32_core",
     "2:0x0004": "InitCombatTable",
+    "2:0x2DEA": "InitGlobalsAtLaunch",
     "3:0x0004": "ResolveCombat",
     "3:0x0332": "KillKeepOwner",
     "3:0x0374": "KillStack",
@@ -141,9 +164,24 @@
     "4:0x026C": "PieceHashRemove",
     "4:0x0E62": "KillTypesAt",
     "4:0x1110": "IsWeakened",
+    "4:0x11BA": "MovesPerDay",
+    "4:0x20EE": "InitNewPiece",
+    "4:0x22E2": "AllocPiece",
+    "4:0x2496": "BuildPiece",
     "4:0x27EE": "KillPiece",
     "4:0x286E": "TypeStrId",
     "4:0x28A8": "Distance",
-    "5:0x23C4": "DayRandomCheck"
+    "5:0x23C4": "DayRandomCheck",
+    "5:0x2428": "MoveArmy",
+    "5:0x2E50": "MoveBomber",
+    "5:0x349E": "MoveFighter",
+    "5:0x3814": "MoveDestroyer",
+    "5:0x3962": "MoveSubmarine",
+    "5:0x3AB0": "MoveTransport",
+    "5:0x3D4E": "MoveCarrier",
+    "5:0x3F58": "MoveBattleship",
+    "5:0x40A6": "RepairStep",
+    "5:0x4110": "RepairInPort",
+    "5:0x42D4": "PlayerTurn"
   }
 }

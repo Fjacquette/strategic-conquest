@@ -10,3 +10,4 @@ each file records the start of the day shown.
 | `s02-day5-army-east.sav` | 6 | Same game; on day 5 the Army moved one square east to column 39, row 28. |
 | `s03-day57-autoplay.sav` | 57 | Same game after Auto Play was switched on at day 6. |
 | `s04-day58-autoplay.sav` | 58 | One round after `s03`. |
+| `s05-hotseat-day2.sav` | 3 | A separate "2 Player Single Mac Game" (game mode 1, skill 4), each side's first Army built and its move skipped. |

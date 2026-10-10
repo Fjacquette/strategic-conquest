@@ -11,7 +11,10 @@ Each entry needs a decision: **reproduce** (match the original exactly) or **fix
 | Q4 | When a Transport or Carrier in a city with an owner loses a fight, the code destroys the *first piece on that square in piece-table order* instead of the ship. If an Army or Fighter was created earlier and sits in the same city, it is destroyed and the ship survives. | `KillStack`, `CODE 3 + 0x0374`; reproduced in the emulator harness (Battleship sinks a Transport in its city: the Army in the city dies, the Transport survives) | Confirmed by running the original code | Pending (suggest: fix, destroy the ship) |
 | Q5 | A Battleship-versus-Submarine column modifier is computed but never added, so Battleships get no bonus against Submarines. Probably a removed or unfinished rule; behavior is consistent either way. | `CODE 3 + 0x018C` | Confirmed in code | Pending (suggest: keep as is) |
 
-See [rules/combat.md](rules/combat.md) for the full combat rules.
+| Q6 | When the piece table is full (449 pieces), the local player's new unit takes over the slot of an existing *opponent* piece: the highest-numbered one that is not spotted and is not an Army, Fighter or Destroyer. Single player only. | `CODE 4 + 0x22E2` | Confirmed in code; rarely reached | Pending (suggest: raise the limit, drop this) |
+| Q7 | Two-player speedups are not applied consistently. Moves and build times use modes 1–3, but double repair and the faster Bomber radius use modes 1 and 2 only, so in an AppleTalk game the Slave machine's units may repair at the single-player rate. Hot seat (mode 1) is fully consistent. | `CODE 5 + 0x4110`, `CODE 4 + 0x20EE` vs `CODE 4 + 0x11BA`, `CODE 1 + 0x021C` | Confirmed in code | Pending (suggest: apply all speedups to both players in the port's two-player games) |
+
+See [rules/combat.md](rules/combat.md) and [rules/units.md](rules/units.md).
 
 ## Open items (not yet classified)
 
