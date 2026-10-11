@@ -1,187 +1,310 @@
 {
-  "globals": {
-    "-0x55C2": [
-      "combat_table",
-      48
-    ],
-    "-0x5592": [
-      "piece_hash",
-      1104
-    ],
-    "-0x5138": [
-      "pieces",
-      6314
-    ],
-    "-0x388E": [
-      "piece_count",
-      2
-    ],
-    "-0x385E": [
-      "cities",
-      460
-    ],
-    "-0x3672": [
-      "island_map",
-      2400
-    ],
-    "-0x2D10": [
-      "move_step",
-      2
-    ],
-    "-0x2D0A": [
-      "local_player",
-      1
-    ],
-    "-0x2D08": [
-      "day",
-      2
-    ],
-    "-0x2CE6": [
-      "skill",
-      1
-    ],
-    "-0x2CD8": [
-      "player_maps",
-      1284
-    ],
-    "-0x27D2": [
-      "terrain",
-      2400
-    ],
-    "-0x1E71": [
-      "game_mode",
-      1
-    ],
-    "-0x1E70": [
-      "game_seed",
-      4
-    ],
-    "-0x1E4F": [
-      "city_count",
-      1
-    ],
-    "-0x1C8C": [
-      "cur_1C8C",
-      46
-    ],
-    "-0x1C5E": [
-      "cur_1C5E",
-      16
-    ],
-    "-0x1C4E": [
-      "cur_1C4E",
-      32
-    ],
-    "-0x1C2E": [
-      "cur_1C2E",
-      2
-    ],
-    "-0x1C02": [
-      "cur_1C02",
-      2
-    ],
-    "-0x1BFC": [
-      "cur_islands",
-      352
-    ],
-    "-0x1386": [
-      "battle_report_list",
-      4
-    ],
-    "-0x1324": [
-      "type_str_ids",
-      20
-    ],
-    "-0x1284": [
-      "own_city_code",
-      3
-    ],
-    "-0x1280": [
-      "opponent_of",
-      3
-    ],
-    "-0x127C": [
-      "prng_seed",
-      4
-    ],
-    "-0x1277": [
-      "init_done_flag",
-      1
-    ],
-    "-0x0F86": [
-      "oth_islands",
-      352
-    ],
-    "-0x0CC6": [
-      "oth_0CC6",
-      2
-    ],
-    "-0x0CC0": [
-      "oth_0CC0",
-      2
-    ],
-    "-0x0CBC": [
-      "oth_0CBC",
-      32
-    ],
-    "-0x0C7C": [
-      "oth_0C7C",
-      46
-    ],
-    "-0x0C20": [
-      "oth_0C20",
-      16
-    ],
-    "-0x023A": [
-      "qd_randSeed",
-      4
-    ],
-    "-0x01BC": [
-      "qd_thePort",
-      4
-    ]
-  },
-  "functions": {
-    "1:0x021C": "ProductionDays",
-    "1:0x0364": "CityProductionTick",
-    "1:0x2140": "AttackAndReport",
-    "1:0x2AFA": "GameRandom",
-    "1:0x39AC": "ReadDateTime",
-    "1:0x3A62": "FSRead",
-    "1:0x3A66": "FSWrite",
-    "1:0x4BC6": "rt_mul32",
-    "1:0x4BFA": "rt_div32",
-    "1:0x4C20": "rt_mod32",
-    "1:0x4C46": "rt_divmod32_core",
-    "2:0x0004": "InitCombatTable",
-    "2:0x2DEA": "InitGlobalsAtLaunch",
-    "3:0x0004": "ResolveCombat",
-    "3:0x0332": "KillKeepOwner",
-    "3:0x0374": "KillStack",
-    "3:0x0492": "ApplyDamage",
-    "3:0x0520": "Attack",
-    "3:0x0A30": "BomberBlast",
-    "4:0x026C": "PieceHashRemove",
-    "4:0x0E62": "KillTypesAt",
-    "4:0x1110": "IsWeakened",
-    "4:0x11BA": "MovesPerDay",
-    "4:0x20EE": "InitNewPiece",
-    "4:0x22E2": "AllocPiece",
-    "4:0x2496": "BuildPiece",
-    "4:0x27EE": "KillPiece",
-    "4:0x286E": "TypeStrId",
-    "4:0x28A8": "Distance",
-    "5:0x23C4": "DayRandomCheck",
-    "5:0x2428": "MoveArmy",
-    "5:0x2E50": "MoveBomber",
-    "5:0x349E": "MoveFighter",
-    "5:0x3814": "MoveDestroyer",
-    "5:0x3962": "MoveSubmarine",
-    "5:0x3AB0": "MoveTransport",
-    "5:0x3D4E": "MoveCarrier",
-    "5:0x3F58": "MoveBattleship",
-    "5:0x40A6": "RepairStep",
-    "5:0x4110": "RepairInPort",
-    "5:0x42D4": "PlayerTurn"
-  }
+ "globals": {
+  "-0x55C2": [
+   "combat_table",
+   48
+  ],
+  "-0x5592": [
+   "piece_hash",
+   1104
+  ],
+  "-0x5138": [
+   "pieces",
+   6314
+  ],
+  "-0x388E": [
+   "piece_count",
+   2
+  ],
+  "-0x385E": [
+   "cities",
+   460
+  ],
+  "-0x3672": [
+   "island_map",
+   2400
+  ],
+  "-0x2D10": [
+   "move_step",
+   2
+  ],
+  "-0x2D0A": [
+   "local_player",
+   1
+  ],
+  "-0x2D08": [
+   "day",
+   2
+  ],
+  "-0x2CE6": [
+   "skill",
+   1
+  ],
+  "-0x2CD8": [
+   "player_maps",
+   1284
+  ],
+  "-0x27D2": [
+   "terrain",
+   2400
+  ],
+  "-0x1E71": [
+   "game_mode",
+   1
+  ],
+  "-0x1E70": [
+   "game_seed",
+   4
+  ],
+  "-0x1E4F": [
+   "city_count",
+   1
+  ],
+  "-0x1C8C": [
+   "cur_1C8C",
+   46
+  ],
+  "-0x1C5E": [
+   "cur_1C5E",
+   16
+  ],
+  "-0x1C4E": [
+   "cur_1C4E",
+   32
+  ],
+  "-0x1C2E": [
+   "cur_1C2E",
+   2
+  ],
+  "-0x1C02": [
+   "cur_1C02",
+   2
+  ],
+  "-0x1BFC": [
+   "cur_islands",
+   352
+  ],
+  "-0x1386": [
+   "battle_report_list",
+   4
+  ],
+  "-0x1324": [
+   "type_str_ids",
+   20
+  ],
+  "-0x1284": [
+   "own_city_code",
+   3
+  ],
+  "-0x1280": [
+   "opponent_of",
+   3
+  ],
+  "-0x127C": [
+   "prng_seed",
+   4
+  ],
+  "-0x1277": [
+   "init_done_flag",
+   1
+  ],
+  "-0x0F86": [
+   "oth_islands",
+   352
+  ],
+  "-0x0CC6": [
+   "oth_0CC6",
+   2
+  ],
+  "-0x0CC0": [
+   "oth_0CC0",
+   2
+  ],
+  "-0x0CBC": [
+   "oth_0CBC",
+   32
+  ],
+  "-0x0C7C": [
+   "oth_0C7C",
+   46
+  ],
+  "-0x0C20": [
+   "oth_0C20",
+   16
+  ],
+  "-0x023A": [
+   "qd_randSeed",
+   4
+  ],
+  "-0x01BC": [
+   "qd_thePort",
+   4
+  ],
+  "-0x513E": [
+   "found_enemy",
+   2
+  ],
+  "-0x513C": [
+   "net_sync",
+   1
+  ],
+  "-0x5142": [
+   "path_step",
+   4
+  ],
+  "-0x513B": [
+   "path_decided",
+   1
+  ],
+  "-0x513A": [
+   "path_sim_steps",
+   2
+  ],
+  "-0x028D": [
+   "region_start",
+   1
+  ],
+  "-0x1A98": [
+   "moves_left",
+   2
+  ],
+  "-0x1A99": [
+   "any_deferred",
+   1
+  ],
+  "-0x1A95": [
+   "step_flag_1a95",
+   1
+  ],
+  "-0x120B": [
+   "piece_deferred",
+   1
+  ],
+  "-0x120A": [
+   "piece_done",
+   1
+  ],
+  "-0x12FC": [
+   "found_cell",
+   2
+  ],
+  "-0x1A9C": [
+   "show_move",
+   1
+  ],
+  "-0x1A9A": [
+   "step_noteworthy",
+   1
+  ],
+  "-0x120C": [
+   "net_view",
+   1
+  ]
+ },
+ "functions": {
+  "1:0x021C": "ProductionDays",
+  "1:0x0364": "CityProductionTick",
+  "1:0x2140": "AttackAndReport",
+  "1:0x2AFA": "GameRandom",
+  "1:0x39AC": "ReadDateTime",
+  "1:0x3A62": "FSRead",
+  "1:0x3A66": "FSWrite",
+  "1:0x4BC6": "rt_mul32",
+  "1:0x4BFA": "rt_div32",
+  "1:0x4C20": "rt_mod32",
+  "1:0x4C46": "rt_divmod32_core",
+  "2:0x0004": "InitCombatTable",
+  "2:0x2DEA": "InitGlobalsAtLaunch",
+  "3:0x0004": "ResolveCombat",
+  "3:0x0332": "KillKeepOwner",
+  "3:0x0374": "KillStack",
+  "3:0x0492": "ApplyDamage",
+  "3:0x0520": "Attack",
+  "3:0x0A30": "BomberBlast",
+  "4:0x026C": "PieceHashRemove",
+  "4:0x0E62": "KillTypesAt",
+  "4:0x1110": "IsWeakened",
+  "4:0x11BA": "MovesPerDay",
+  "4:0x20EE": "InitNewPiece",
+  "4:0x22E2": "AllocPiece",
+  "4:0x2496": "BuildPiece",
+  "4:0x27EE": "KillPiece",
+  "4:0x286E": "TypeStrId",
+  "4:0x28A8": "Distance",
+  "5:0x23C4": "DayRandomCheck",
+  "5:0x2428": "MoveArmy",
+  "5:0x2E50": "MoveBomber",
+  "5:0x349E": "MoveFighter",
+  "5:0x3814": "MoveDestroyer",
+  "5:0x3962": "MoveSubmarine",
+  "5:0x3AB0": "MoveTransport",
+  "5:0x3D4E": "MoveCarrier",
+  "5:0x3F58": "MoveBattleship",
+  "5:0x40A6": "RepairStep",
+  "5:0x4110": "RepairInPort",
+  "5:0x42D4": "PlayerTurn",
+  "5:0x1592": "OrderStep",
+  "5:0x1B72": "StepExecutor",
+  "5:0x0916": "ExecuteMove",
+  "5:0x0676": "Fight",
+  "5:0x02B4": "BattleMessages",
+  "5:0x027C": "PickMessageForPlayer",
+  "5:0x4C42": "RegionBounds",
+  "5:0x340A": "FighterOutOfFuel",
+  "5:0x2DD6": "BomberOutOfFuel",
+  "5:0x5CBA": "ControllerRequest",
+  "5:0x51FE": "HumanController",
+  "4:0x0042": "HashOf",
+  "4:0x006C": "HashClear",
+  "4:0x00A0": "HashInsert",
+  "4:0x02EE": "HashFind",
+  "4:0x257E": "TopPieceAt",
+  "4:0x2960": "OnMap",
+  "4:0x12C4": "EnemyAdjacent",
+  "4:0x12B6": "FoundEnemy",
+  "4:0x0C96": "TopIs",
+  "4:0x0D20": "BoardingFull",
+  "4:0x03A2": "CountAt",
+  "4:0x0004": "SpottedValue",
+  "4:0x24FC": "OwnPiecesAt",
+  "4:0x0500": "Explore",
+  "4:0x082A": "MovePiece",
+  "4:0x0F2C": "CarryCargo",
+  "4:0x08D4": "WakeAdjacent",
+  "4:0x0DD4": "WakeAllAt",
+  "4:0x259A": "CompactPieces",
+  "4:0x19DA": "NextStep",
+  "4:0x15A4": "LineDirection",
+  "4:0x28E2": "LineStep",
+  "4:0x1460": "LineClear",
+  "4:0x166A": "FollowEdge",
+  "4:0x1364": "Rotate",
+  "4:0x1D82": "SimStep",
+  "4:0x1EE8": "ChooseDetour",
+  "4:0x178E": "RandomStep",
+  "1:0x28C6": "TerrainNear",
+  "1:0x06AC": "SetDestination",
+  "1:0x0188": "CityAt",
+  "1:0x02B6": "SetCityOwner",
+  "1:0x0928": "Beep",
+  "1:0x0176": "SetNetSync",
+  "1:0x3520": "MessageA",
+  "1:0x35E2": "MessageB",
+  "1:0x2052": "ReportCityCaptured",
+  "1:0x1FC8": "ReportCityRepelled",
+  "1:0x20E2": "ReportBomberAttack",
+  "1:0x0102": "QDRandomCopy",
+  "1:0x2B56": "QDRandom",
+  "1:0x068E": "RandomBool",
+  "1:0x4D24": "rt_set_singleton",
+  "1:0x4D66": "rt_set_union",
+  "1:0x4DB6": "rt_set_resize",
+  "6:0x583E": "FindPieceNear",
+  "6:0x0004": "RerouteEdgeShip",
+  "6:0x658A": "WakePlayer2Types",
+  "7:0x11EA": "AIPlan",
+  "1:0x0626": "AINewPiece",
+  "6:0x5102": "AIMoveChooser",
+  "6:0x4C72": "AIProduction"
+ }
 }

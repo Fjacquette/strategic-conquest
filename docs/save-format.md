@@ -77,15 +77,18 @@ type is 9 (empty slot). The table holds at most 450 pieces.
 
 | Byte | Meaning |
 |---|---|
-| 0–1 | (y, x) point A. Set to the build position; later use not yet decoded |
-| 2–3 | (y, x) point B: destination when the piece has go-to orders (a new piece copies its city's Army destination here) |
-| 4–5 | (y, x) point C. Set to the build position; later use not yet decoded |
+| 0–1 | (y, x) point A: the other end of a patrol; also the start of a go-to trip |
+| 2–3 | (y, x) point B: destination under go-to orders (new Armies and aircraft copy their city's destinations) |
+| 4–5 | (y, x) point C: start of the current straight leg toward B (moved along while going around obstacles) |
 | 6–7 | (y, x) current position |
-| 8–9 | Big-endian word. Bits 0–4: current move step within the day (1-based). Bits 5–9: fuel (Fighter, Bomber) or cargo count (Transport, Carrier). Bits 10–15: Bomber blast radius |
-| 10 | Bits 0–3 type, bits 4–5 owner (1 or 2), bits 6–7 unknown |
-| 11 | Bit 2: has moved this day. Bits 3–4: orders (2 = go to destination). Bits 6–7: state (1 when built; 2 while awaiting repair, reset to 1 when fully repaired). Bits 0, 1 and 5 not yet decoded |
-| 12 | Bits 0–4 strength. Bits 6–7: spotted (set on a Submarine found by a Destroyer; 0 means it strikes first when attacked, see [combat](rules/combat.md)). Bit 5 unknown |
-| 13 | 1 once a ship has been repaired during its current stay in port |
+| 8–9 | Big-endian word. Bits 0–4: current move step within the day (1-based; 0 before the first step). Bits 5–9: fuel (Fighter, Bomber), cargo count (Transport, Carrier), or for Armies a flag that keeps an Army aboard ship awake. Bits 10–15: Bomber blast radius |
+| 10 | Bits 0–3 type, bits 4–5 owner (1 or 2; a destroyed piece may keep its owner), bits 6–7 attacks made this day (moves end after the second) |
+| 11 | Bit 0: patrol. Bit 2: has moved this day. Bits 3–4: orders (2 straight to B; 1 or 0 going around an obstacle clockwise or counterclockwise). Bit 5: random moves. Bits 6–7: state (0 under orders, 1 awake, 2 asleep, 3 Transport loading); see [movement](rules/movement.md#piece-states-and-orders) |
+| 12 | Bits 0–4 strength. Bit 5: last horizontal move was to the left (display). Bits 6–7: spotted (0 unseen; Submarines at 0 strike first when attacked, see [combat](rules/combat.md)) |
+| 13 | 1 once a ship has been repaired today |
+
+The day counters (move step, moved flag, attacks, repaired) are reset for every piece at
+the start of each day (`CODE 1 + 0x1BBE`).
 
 Type codes (a lookup table in EMPINIT, `CODE 2 + 0x2D0E`, maps them to the STR names):
 
@@ -115,13 +118,15 @@ Two 642-byte structures, player 1 then player 2.
 
 | Byte | Meaning |
 |---|---|
-| 0–1 | (y, x) position |
-| 2–3 | (y, x). Equal to the position in every save so far; possibly the city's Army destination ("CAD" in the production dialog) |
+| 0–1 | (y, x) Army destination ("CAD"): new Armies get go-to orders here. Equal to the position when unset |
+| 2–3 | (y, x) aircraft destination ("CAAD"): new aircraft, and human players' aircraft arriving at the city, are sent here. Equal to the position when unset |
 | 4 | Owner: 0 neutral, 1 player 1, 2 player 2 |
 | 5 | Days until the current unit is complete |
-| 6–7 | (y, x). Equal to the position in every save so far; possibly the aircraft destination ("CAAD") |
+| 6–7 | (y, x) position |
 | 8 | Piece type in production (codes above) |
 | 9 | Island number (1–15) |
+
+Capturing a city resets both destinations to the position and its production to Army.
 
 ## Per-island records (offsets 10469 and 10821, 352 bytes each)
 

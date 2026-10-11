@@ -1,9 +1,10 @@
 # Combat (3.01)
 
-**Status: decoded and verified.** `tools/model/combat.py` reproduces the original battle code
-exactly. Run on the emulated 68040 against the original routines, it matched in 23,000 random
-attacks and 1,000 Bomber blasts: identical piece tables, city table, terrain map, PRNG state
-and return value in every case (`tools/emu/test_combat.py`, `tools/emu/test_bomber.py`).
+**Status: decoded and verified.** `engine/src/battle.ts` reproduces the original battle code
+exactly: run on the emulated 68040 against the original routines on random attacks and
+Bomber blasts, the whole game state (pieces, position hash, cities, terrain, PRNG) and the
+return value match in every case (`tools/emu/test_battle.py`), and battles inside whole
+turns match too (`tools/emu/test_turn.py`).
 
 Source: battle segment (CODE 3). `Attack` (`CODE 3 + 0x0520`) is called from Mover through
 `AttackAndReport` (`CODE 1 + 0x2140`), which also logs the fight for the battle summary.
@@ -111,21 +112,25 @@ per piece with strength above 1.
 ## 6. Bomber blast
 
 `BomberBlast` (`CODE 3 + 0x0A30`). The Bomber's record holds a blast radius in bits 2–7 of
-byte 8 (how it is set is to be documented with movement). Every square within that radius
-(Chebyshev distance: the larger of the column and row differences) is hit:
+byte 8, fixed when it is built (see [units.md](units.md)); the blast happens when the Bomber
+reaches an enemy city or enemy surface piece (see [movement.md](movement.md#per-type-rules)).
+Every square within that radius (Chebyshev distance: the larger of the column and row
+differences) is hit:
 
 - Armies and ships are destroyed, the Bomber's own side included. A Carrier is destroyed
   together with every Fighter and Carrier on its square.
 - Aircraft in flight are unaffected; aircraft parked in an owned city are destroyed.
-- Every city in range becomes neutral: owner, production countdown and production type
-  are reset, and the map cell becomes a neutral city.
+- Every city in range (by its position, bytes 6–7 of the city record) becomes neutral:
+  owner, production countdown and production type are reset, and the map cell becomes a
+  neutral city.
 
 No random numbers are used.
 
 ## 7. Implementation notes for the port
 
 - A destroyed piece is first marked type 8 ("removed") with its owner restored, so the
-  battle summary can report it; the slot is freed later.
+  battle summary can report it; it is dropped from the position hash at once and its slot
+  is freed when the table is compacted.
 - The original also contains a debugging cheat and a bug; both are listed in
   [quirks.md](../quirks.md) (Q3, Q4) for a decision.
 - A Battleship-versus-Submarine modifier is evaluated but never applied (dead code), so

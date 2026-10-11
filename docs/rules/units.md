@@ -1,8 +1,9 @@
 # Units and production (3.01)
 
-**Status: decoded and verified.** `tools/model/units.py` matches the original routines in
-5,008 checks covering every type, strength and game mode and a range of days, including
-the full record written for a newly built piece (`tools/emu/test_units.py`). The two-player
+**Status: decoded and verified.** `engine/src/units.ts` matches the original routines for
+every type, strength and game mode and a range of days, and builds the same pieces into
+random worlds, piece table and position hash included, also with a full table
+(`tools/emu/test_units.py`). The two-player
 production times and Army moves were also confirmed in the running game.
 
 ## Game modes

@@ -7,6 +7,11 @@ The original 68k Macintosh binary is the specification: it is disassembled to re
 exact rules, turn engine, map generation and computer opponent, and a new engine reproduces
 that behavior. The user interface is new (larger graphics) and multiplayer runs over the web.
 
+The engine (`engine/`, TypeScript) is a routine-by-routine reimplementation of the
+original game logic. It keeps the game state in the same byte layout as the original's
+globals, so each routine can be checked against the original code running in a 68k
+emulator on thousands of random cases (differential tests in `tools/emu/`).
+
 ## Project decisions
 
 - **Reference version:** 3.01. Version 2.055 (Strategic Conquest Plus) is kept as a secondary
@@ -32,8 +37,8 @@ that behavior. The user interface is new (larger graphics) and multiplayer runs 
 | `docs/rules/` | Game rules recovered from the code, one file per subsystem |
 | `tools/analysis/` | Resource-fork, disassembly, cross-reference and comparison scripts |
 | `tools/save/sc3save.py` | Save-file reader: text dump and map rendering |
-| `tools/model/` | Python reference models of the original rules |
-| `tools/emu/` | Harness that runs the original routines on an emulated 68040, and differential tests against the models |
+| `engine/` | The game engine in TypeScript: state layout, movement, combat, units, path finding (`engine/src`); bridge used by the tests (`engine/test`) |
+| `tools/emu/` | Harness that runs the original routines on an emulated 68040, and differential tests of the engine against them |
 | `tools/extract.sh` | Unpacks the game archive into `build/sc301.rsrc` |
 | `emulator/` | Headless Basilisk II setup and control scripts |
 | `saves/3.01/` | Saved games produced in the emulator, with descriptions |
@@ -53,8 +58,10 @@ Place these in `originals/` before running the tools or emulator:
 
 ```bash
 pip install --break-system-packages -r tools/requirements.txt
+(cd engine && npm install && npm run check)        # Node 22+; type-checks the engine
 tools/extract.sh                                   # writes build/sc301.rsrc
-python3 -I tools/emu/test_combat.py 3000          # original combat code vs the Python model
+python3 -I tools/emu/test_turn.py 500             # whole turns: original code vs the engine
+python3 -I tools/emu/test_battle.py               # also test_hash, test_tools, test_path, test_units
 python3 -I tools/analysis/codeinfo.py build/sc301.rsrc
 python3 -I tools/save/sc3save.py dump saves/3.01/s04-day58-autoplay.sav
 python3 -I tools/save/sc3save.py render saves/3.01/s04-day58-autoplay.sav build/day58.png --player 1

@@ -82,9 +82,9 @@ directly in a CPU emulator with a chosen seed.
 - Seed is QuickDraw's `randSeed` at `A5-$23A` (`thePort` is `A5-$1BC`, from the `InitGraf`
   call at `CODE 1 + 0x176A`; `randSeed` sits 126 bytes below `thePort`).
 - 14 call sites: 13 in EMPINIT (map generation and setup), 1 in Mover (`CODE 5 + 0x23FE`).
-- The ROM implementation is believed to be the Park–Miller generator (multiplier 16807,
-  modulus 2³¹−1), returning the low 16 bits. To be confirmed against the emulator,
-  including edge cases.
+- Park–Miller generator (multiplier 16807, modulus 2³¹−1), returning the low 16 bits
+  (−32768 maps to 0). The game also carries its own copy (`CODE 1 + 0x0102`), which the
+  engine's implementation matches, edge cases included.
 
 ### 2. Game PRNG
 
@@ -99,20 +99,20 @@ directly in a CPU emulator with a chosen seed.
   ```
 
 - The masking leaves 15 bits of effective state; the period is 16,384 calls.
-- 8 call sites: battle ×3, machine ×4, tools ×1.
+- 8 call sites: battle ×3, machine ×4, tools ×1 (path finding: a coin toss between two equally long detours).
 - Reseeded from the clock at the end of every day, as described above.
 
 ### Day-dependent random check in Mover
 
-Routine at `CODE 5 + 0x23C4` (not in the jump table, so called only from within Mover) returns
-a Boolean based on the day number (`A5-$2D08`):
+Routine at `CODE 5 + 0x23C4` decides whether an Army's attempt to capture a city succeeds;
+see [rules/movement.md](rules/movement.md#city-capture). It uses QuickDraw `Random`:
 
 - Day < 30: always TRUE.
 - Days 30–59: FALSE with probability d/16, where d = (day − 30) div 6 + 1 (1/16 up to 5/16).
 - Day ≥ 60: FALSE with probability 6/16.
 
-The random draw is `(Random & 0x7FFF) mod 16`, using QuickDraw `Random`. What the routine
-gates is not yet known.
+QuickDraw `Random` is also used for Random orders and by computer-opponent code applied to
+player-2 ships at the map edge; the game PRNG also breaks ties in path finding.
 
 ### Other day-loop behavior noted
 
@@ -179,3 +179,30 @@ Layout details are in [save-format.md](save-format.md).
   "A new game will be created after this day has completed."
 - Auto Play state is stored in the save, so a game saved during Auto Play resumes in
   Auto Play.
+
+## Position hash
+
+Besides the piece table, the game keeps a hash from map cell to pieces (`A5-$5592`, 551
+word slots plus the longest probe length, `CODE 4 + 0x0042..0x02EE`). Lookups return the
+first live piece on a cell in probe order, and insertion keeps a Transport ahead of the
+Armies on its cell and a Carrier ahead of its Fighters, so "the piece on a cell" is the
+ship when there is one. The hash is not saved: loading and every compaction of the piece
+table rebuild it. The engine keeps it byte for byte, since which piece a lookup returns
+affects the rules.
+
+## Reads of uninitialised memory
+
+A few routines read variables that were never set, so their behavior depends on what
+earlier calls left on the stack. The engine replaces each with the value the original
+usually sees, and the differential tests set the original's variable to that value:
+
+- `MovesPerDay` (`CODE 4 + 0x11BA`) for a destroyed piece (type 8) returns its caller's
+  register D7, which in `PlayerTurn` is the piece's index. The turn loop therefore keeps
+  stepping a piece destroyed earlier in its turn, posting "before step" requests, until
+  the step count passes its index. No game state changes.
+- The capture exploration in `MoveArmy` uses an uninitialised piece record (quirk Q9).
+- The movers' direction variables are unset in one branch of the orders step (quirk Q11).
+- `BomberBlast` ends by passing register D5 to `CODE 1 + 0x0176` when it is non-zero; it
+  holds `MoveBomber`'s last exploration result.
+- Request records are built field by field in the caller's frame, so fields a request
+  does not set hold leftovers. Controllers should only read the fields each request sets.
