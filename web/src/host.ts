@@ -11,20 +11,24 @@
  */
 import { Mem } from "../../engine/src/mem.ts";
 import {
-  ARMY, BOMBER, DAY, FIGHTER, GAME_MODE, LOCAL_PLAYER, MOVES_LEFT, OPPONENT_OF, OWN_CITY_CODE, PIECE_DONE, WATER,
+  ARMY, BOMBER, CARRIER, DAY, EMPTY, FIGHTER, GAME_MODE, LOCAL_PLAYER, MOVES_LEFT, OPPONENT_OF, OWN_CITY_CODE, PIECE_DONE,
+  REMOVED, TRANSPORT, WATER,
 } from "../../engine/src/globals.ts";
 import { type Host, type Message, Reply, Request, RequestCode } from "../../engine/src/host.ts";
-import { explored, isComputer, terrainNear } from "../../engine/src/map.ts";
+import { topPieceAt } from "../../engine/src/hash.ts";
+import { explored, isComputer, terrainAt, terrainNear } from "../../engine/src/map.ts";
 import * as orders from "../../engine/src/orders.ts";
-import { pieceAt, pOwner, pRadius, pSpotted, pState, pType, pX, pY, setSpotted } from "../../engine/src/piece.ts";
-import { enemyAdjacent, foundEnemy } from "../../engine/src/query.ts";
+import {
+  pBit5, pCargo, pieceAt, pMoved, pOwner, pPatrol, pRadius, pSpotted, pState, pStrength, pType, pX, pY, setSpotted,
+} from "../../engine/src/piece.ts";
+import { enemyAdjacent, foundEnemy, ownPiecesAt, pieceCount } from "../../engine/src/query.ts";
 import { qdRandom } from "../../engine/src/random.ts";
 import { cityRec, productionDays } from "../../engine/src/units.ts";
 import { Input } from "./input.ts";
-import { CH, CW, MapView } from "./mapview.ts";
+import { CH, CW, MapView, RULER_LEFT, RULER_TOP } from "./mapview.ts";
 import { BATTLE, BLAST, EXPLOSION, Sound } from "./sound.ts";
 import { Words } from "./text.ts";
-import { UI, type ProductionChoice } from "./ui.ts";
+import { UI, type PieceCard, type PieceRow, type ProductionChoice } from "./ui.ts";
 
 /** Seconds between 1904 (the Mac's epoch) and 1970. */
 const MAC_EPOCH = 2082844800;
@@ -50,6 +54,8 @@ export class BrowserHost implements Host {
   m: Mem | null = null;
   /** The direction request being answered, if any. */
   private current: { req: Request; reply: Reply } | null = null;
+  /** The square the map was last brought into view for (CODE 13 + 0x0A38 keeps it). */
+  private shown: [number, number] | null = null;
   private drawPending = false;
 
   constructor(ui: UI, view: MapView, input: Input, words: Words, sound: Sound) {
@@ -71,6 +77,7 @@ export class BrowserHost implements Host {
   }
 
   async request(m: Mem, req: Request, reply: Reply): Promise<void> {
+    await this.ui.whenClosed();
     if (isComputer(m, req.player)) {
       if (req.code === RequestCode.DIRECTION) {
         // The computer opponent is not ported yet: its pieces stand still.
@@ -104,12 +111,12 @@ export class BrowserHost implements Host {
         this.redraw(m);
         return;
       case RequestCode.SHOW_POSITION:
-        if (req.player === local) this.view.reveal(req.pos & 0xff, req.pos >> 8, this.ui.viewport);
+        if (req.player === local) this.show(req.pos & 0xff, req.pos >> 8);
         this.redraw(m);
         return;
       case RequestCode.CITY_REPELLED_OR_NEUTRAL:
       case RequestCode.BATTLE:
-        this.view.reveal(req.pos & 0xff, req.pos >> 8, this.ui.viewport);
+        this.show(req.pos & 0xff, req.pos >> 8);
         await this.battle(m, req);
         return;
       case RequestCode.BOMBER_BLAST_DONE:
@@ -135,7 +142,7 @@ export class BrowserHost implements Host {
 
   /**
    * The sound of a step (CODE 5 + 0x5218), made only where the player can see it: on a
-   * square in view that he has explored, by a piece not aboard another. An Army sounds the
+   * square in view that he has explored, by a piece neither asleep nor loading. An Army sounds the
    * battle beside a spotted enemy piece or an enemy city; otherwise it marches, if it is his
    * own, without cutting off another sound. His Fighters, ships and Bombers sound their
    * own, cutting off any other sound, but not the same sound for the same type of piece.
@@ -197,7 +204,7 @@ export class BrowserHost implements Host {
     const x = req.pos & 0xff, y = req.pos >> 8;
     const enemy = m.sb(GAME_MODE) === 0 && req.player !== m.sb(LOCAL_PLAYER);
     if (enemy) await this.alert();
-    this.view.reveal(x, y, this.ui.viewport);
+    this.show(x, y);
     if (enemy) await this.alert();
     this.view.blast = { x, y, radius: Math.max(1, pRadius(m, pieceAt(req.index))) };
     this.sound.play(BLAST, true);
@@ -220,7 +227,7 @@ export class BrowserHost implements Host {
     const p = pieceAt(req.index);
     this.current = { req, reply };
     this.view.focus = req.index;
-    this.view.reveal(pX(m, p), pY(m, p), this.ui.viewport);
+    this.show(pX(m, p), pY(m, p));
     this.ui.setTurn(true, pType(m, p));
     let mode = "";
     const status = () => {
@@ -247,6 +254,7 @@ export class BrowserHost implements Host {
         } else if (c.kind === "key") {
           switch (c.key) {
             case "s": done = orders.sleep(m, req, reply, player); break;
+            case "i": await this.showPieceInfo(m); break;
             case "r": done = orders.random(m, req, reply, player); break;
             case "n": done = orders.skip(m, reply); break;
             case "b": done = orders.moveLater(m, reply); break;
@@ -268,7 +276,7 @@ export class BrowserHost implements Host {
           }
           mode = "";
         } else if (c.kind === "open") {
-          await this.openCity(m, player, c.x, c.y);
+          await this.openSquare(m, c.x, c.y);
         }
         if (done) break;
         status();
@@ -312,21 +320,95 @@ export class BrowserHost implements Host {
     return c;
   }
 
-  /** A double-click on one of the player's cities opens its production dialog. */
-  private async openCity(m: Mem, player: number, x: number, y: number): Promise<void> {
-    if (!this.ownCityAt(m, player, x, y)) return;
-    this.input.enabled = false;
-    await this.production(m, x, y, player, false);
-    this.input.enabled = true;
+  /** Bring square (x, y) into view and remember it (CODE 13 + 0x0A38). */
+  private show(x: number, y: number): void {
+    this.shown = [x, y];
+    this.view.reveal(x, y, this.ui.viewport);
   }
 
-  private ownCityAt(m: Mem, player: number, x: number, y: number): boolean {
-    const n = m.sb(-0x1e4f);
-    for (let i = 1; i <= n; i++) {
-      const c = cityRec(i);
-      if (m.sb(c + 7) === x && m.sb(c + 6) === y) return m.sb(c + 4) === player;
+  /** Displays > Current Piece: the map back to the square last brought into view. */
+  showCurrent(): void {
+    if (this.shown) this.show(...this.shown);
+  }
+
+  /** Displays > Show Piece Info (CODE 16 + 0x0DAC): the square last brought into view, opened. */
+  async showPieceInfo(m: Mem): Promise<void> {
+    if (!this.shown) return;
+    this.show(...this.shown);
+    await this.openSquare(m, ...this.shown);
+  }
+
+  /**
+   * An explored square opened by a double-click or Show Piece Info (CODE 13 + 0x0028,
+   * CODE 13 + 0x06FE): one of the player's cities shows its production; a square where his
+   * piece is on top shows the piece information.
+   */
+  private async openSquare(m: Mem, x: number, y: number): Promise<void> {
+    const local = m.sb(LOCAL_PLAYER);
+    if (!explored(m, local, x, y)) return;
+    const wasEnabled = this.input.enabled;
+    this.input.enabled = false;
+    try {
+      if (terrainAt(m, x, y) === m.sb(OWN_CITY_CODE + local)) {
+        await this.production(m, x, y, local, false);
+      } else {
+        const top = topPieceAt(m, x, y);
+        if (top !== 0 && pOwner(m, pieceAt(top)) === local) await this.pieceInfo(m, x, y);
+      }
+    } finally {
+      this.input.enabled = wasEnabled;
     }
-    return false;
+  }
+
+  /**
+   * The piece information window (CODE 19 + 0x0406) for the player's pieces on (x, y), one
+   * at a time in piece-table order, on the half of the map away from the square.
+   */
+  private async pieceInfo(m: Mem, x: number, y: number): Promise<void> {
+    const local = m.sb(LOCAL_PLAYER);
+    const count = ownPiecesAt(m, x, y, local);
+    let shown = 1;
+    const nth = (k: number): number => {
+      const n = pieceCount(m);
+      for (let i = 1; i <= n; i++) {
+        const p = pieceAt(i);
+        if (pX(m, p) === x && pY(m, p) === y && pType(m, p) !== REMOVED && pType(m, p) !== EMPTY && --k === 0) return i;
+      }
+      return 0;
+    };
+    const card = (): PieceCard => this.pieceCard(m, nth(shown), shown, count);
+    const next = () => { shown = (shown % count) + 1; };
+    // The window opens near the map's top-left corner, or in its right half when the square
+    // is in the left half.
+    const view = this.ui.viewport.getBoundingClientRect();
+    const s = this.view.scale;
+    const left = view.left + (RULER_LEFT + 16) * s, top = view.top + (RULER_TOP + 12) * s;
+    const squareX = this.view.canvas.getBoundingClientRect().left + (x - 0.5) * CW * s;
+    const inLeftHalf = squareX <= view.left + view.width / 2;
+    await this.ui.pieceInfo(card, next, { left: inLeftHalf ? view.left + view.width / 2 + 20 : left, top });
+  }
+
+  /** CODE 19 + 0x0004: what the piece information window says about piece `idx`. */
+  private pieceCard(m: Mem, idx: number, n: number, count: number): PieceCard {
+    const p = pieceAt(idx);
+    const type = pType(m, p);
+    const at = (y: number, x: number) => `: ${y},${x}`;
+    const rows: PieceRow[] = [
+      { label: `${n} of ${count}` },
+      { label: "Strength", value: `: ${pStrength(m, p)}` },
+      { label: "Position(v,h)", value: at(pY(m, p), pX(m, p)) },
+    ];
+    const state = pState(m, p);
+    const movement = state === 1 ? " Manual" : state === 2 ? " Sleep" : state === 3 ? " Load"
+      : pBit5(m, p) ? " Random" : pPatrol(m, p) ? " Patrol" : " Destination";
+    rows.push({ label: `Movement:${movement}` });
+    if (movement === " Destination") rows.push({ label: "Target", value: at(m.sb(p + 2), m.sb(p + 3)) });
+    rows.push({ label: pMoved(m, p) ? "Piece moved today" : "Piece not moved today" });
+    if (type === FIGHTER) rows.push({ label: `Fuel: ${pCargo(m, p)}` });
+    else if (type === BOMBER) rows.push({ label: `Fuel: ${pCargo(m, p)}, Blast Radius:${pRadius(m, p)}` });
+    else if (type === CARRIER) rows.push({ label: `${pCargo(m, p)} Fighters on board` });
+    else if (type === TRANSPORT) rows.push({ label: `${pCargo(m, p)} Armies on board` });
+    return { name: this.words.typeName(type), type, rows };
   }
 
   /** Whether the player is being asked to move a piece (menu commands that change orders work then). */

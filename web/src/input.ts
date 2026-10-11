@@ -21,7 +21,7 @@ const DIRECTIONS: Record<string, [number, number]> = {
 };
 
 /** Keys of the Moves menu, as in the original (no Command key needed). */
-const COMMAND_KEYS = new Set(["s", "w", "l", "r", "c", "a", "m", "p", "n", "b", "escape"]);
+const COMMAND_KEYS = new Set(["s", "w", "l", "r", "c", "a", "m", "p", "n", "b", "escape", "i"]);
 
 export class Input {
   private queue: Command[] = [];

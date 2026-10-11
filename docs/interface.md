@@ -31,7 +31,7 @@ Where sounds play:
 
 | Occasion | Sound |
 |---|---|
-| A step shown to the player (requests 21 and 22 with the flag set; `CODE 5 + 0x5218`). Only on a square inside the map window that the local player has explored, and only for a piece that is not aboard another (state 2 or 3). | An Army next to an enemy piece: LBattle (forced) if that piece is spotted, LArmy (not forced) if not. An Army next to an enemy city: LBattle (forced). Any other Army: LArmy (not forced), the local player's own only. The local player's other pieces: their type's sound (forced), unless a piece of the same type is the last to have asked and its sound is still playing. The enemy's other pieces make no sound. |
+| A step shown to the player (requests 21 and 22 with the flag set; `CODE 5 + 0x5218`). Only on a square inside the map window that the local player has explored, and only for a piece that is neither asleep nor loading (state 2 or 3; Armies aboard a Transport are asleep). | An Army next to an enemy piece: LBattle (forced) if that piece is spotted, LArmy (not forced) if not. An Army next to an enemy city: LBattle (forced). Any other Army: LArmy (not forced), the local player's own only. The local player's other pieces: their type's sound (forced), unless a piece of the same type is the last to have asked and its sound is still playing. The enemy's other pieces make no sound. |
 | A fight (requests 4 and 16; `CODE 17 + 0x0CC2`) | LExplosion (forced). At the second of the four flashes, an Army's fight changes to LBattle (forced) if QuickDraw's `Random` is odd or the explosion has finished; any other piece's explosion starts again (forced). |
 | A Bomber's blast (request 18; `CODE 17 + 0x0E56`) | LExplosion (forced) while the blast is shown. |
 | The computer's Bomber reaches its target (`CODE 5 + 0x31CE`), then its blast is shown (`CODE 5 + 0x5BDA`, single player only) | The system beep; then the beep again before and after the map scrolls to the blast. |
@@ -63,3 +63,26 @@ The differential tests stand in for `ControllerRequest`, so neither happens in t
 user interface must do both, as the browser host does. In a network game a fight is shown
 on the mover's machine only (the engine addresses it to the mover); whether the attacker
 is then spotted on the Master is not yet checked.
+
+## Piece information and the remembered square
+
+The routine that scrolls the map to a square (`CODE 13 + 0x0A38`) also remembers it. It
+runs for each piece the player is asked to move, for fights and blasts, and for the
+player's own positions shown during his turn. Displays > Current Piece scrolls back to the
+remembered square; Displays > Show Piece Info (⌘I, `CODE 16 + 0x0DAC`) scrolls back and
+opens it as a double-click on the map does (`CODE 13 + 0x0028`, `CODE 13 + 0x06FE`):
+nothing on a square the player has not explored, the production dialog on one of his
+cities, and the piece information window where his piece is on top.
+
+The piece information window (WIND 273, `CODE 19 + 0x0406`) shows one of the player's
+pieces on the square at a time, in piece-table order: its type and picture, "n of m",
+strength, position, movement (Manual, Sleep, Load, Random, Patrol, or Destination with the
+target), whether it has moved today, and fuel (Fighters; Bombers also their blast radius)
+or the pieces aboard (Carriers, Transports). A click in the window or a key shows the next
+piece; Return, Enter or a click elsewhere closes it. It opens over the left part of the
+map, or over the right half when the square is in the left half.
+
+## Menus in single player
+
+Options > Send Message and Options > Battle Summary are disabled in single player
+(`CODE 12 + 0x00DA`); both belong to the two-player game.

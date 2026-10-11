@@ -29,6 +29,19 @@ export interface ProductionChoice {
   allowed: boolean;
 }
 
+/** One row of the piece information window: a label, and a value in a column after it. */
+export interface PieceRow {
+  label: string;
+  value?: string;
+}
+
+/** What the piece information window shows of one piece. */
+export interface PieceCard {
+  name: string;
+  type: number;
+  rows: PieceRow[];
+}
+
 /** One row of the city list. */
 export interface CityRow {
   city: number;
@@ -53,6 +66,7 @@ export class UI {
   private readonly assets: Assets;
   private readonly words: Words;
   private openMenu: HTMLElement | null = null;
+  private readonly closedWaiters: (() => void)[] = [];
 
   constructor(assets: Assets, words: Words) {
     this.assets = assets;
@@ -124,7 +138,67 @@ export class UI {
 
   private close(): void {
     this.overlay.hidden = true;
+    delete this.overlay.dataset.placed;
+    this.dialog.removeAttribute("style");
     this.dialog.replaceChildren();
+    for (const w of this.closedWaiters.splice(0)) w();
+  }
+
+  /** Resolves when no dialog is open: the game waits while one is, as the original's dialogs are modal. */
+  whenClosed(): Promise<void> {
+    if (!this.modal) return Promise.resolve();
+    return new Promise((resolve) => this.closedWaiters.push(resolve));
+  }
+
+  /**
+   * The piece information window (WIND 273, CODE 19 + 0x0406): a box with its top-left
+   * corner at `at` (page pixels), showing one of the player's pieces on a square. A click in
+   * it or a key shows the next one; Return, Enter or a click outside closes it.
+   */
+  pieceInfo(card: () => PieceCard, next: () => void, at: { left: number; top: number }): Promise<void> {
+    return new Promise((resolve) => {
+      const show = (d: HTMLDivElement) => {
+        const c = card();
+        d.replaceChildren(
+          el("div", { class: "title" }, el("span", {}, c.name), iconCanvas(this.assets, BITS.unitRight[c.type], 1)),
+          ...c.rows.map((r) => el("div", { class: "row" },
+            ...(r.value === undefined ? [r.label] : [el("span", { class: "label" }, r.label), r.value]))),
+        );
+      };
+      const done = () => {
+        this.overlay.removeEventListener("pointerdown", onPointer);
+        window.removeEventListener("keydown", onKey, true);
+        this.close();
+        resolve();
+      };
+      const onPointer = (e: PointerEvent) => {
+        if (this.dialog.contains(e.target as Node)) {
+          next();
+          show(this.dialog);
+        } else {
+          done();
+        }
+      };
+      const onKey = (e: KeyboardEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === "Enter") {
+          done();
+        } else if (!["Shift", "Control", "Alt", "Meta"].includes(e.key)) {
+          next();
+          show(this.dialog);
+        }
+      };
+      this.open((d) => {
+        d.classList.value = "dialog pieceinfo";
+        this.overlay.dataset.placed = "";
+        d.style.left = `${at.left}px`;
+        d.style.top = `${at.top}px`;
+        show(d);
+      });
+      this.overlay.addEventListener("pointerdown", onPointer);
+      window.addEventListener("keydown", onKey, true);
+    });
   }
 
   private button(label: string, isDefault: boolean, onClick: () => void): HTMLButtonElement {

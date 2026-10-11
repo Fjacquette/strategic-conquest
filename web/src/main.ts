@@ -12,7 +12,6 @@ import { initGlobals } from "../../engine/src/launch.ts";
 import { playerMap, terrainNear } from "../../engine/src/map.ts";
 import { generateMap } from "../../engine/src/mapgen.ts";
 import { newGame } from "../../engine/src/newgame.ts";
-import { pieceAt, pX, pY } from "../../engine/src/piece.ts";
 import { ownPiecesAt } from "../../engine/src/query.ts";
 import { cityRec } from "../../engine/src/units.ts";
 import { assets } from "./assets.ts";
@@ -92,11 +91,9 @@ function start(): void {
     new: async () => {
       if (await ui.ask(words.str(1027), "OK", "Cancel")) location.reload();
     },
-    current: () => {
-      const m = host.m;
-      if (!m || !view.focus) return;
-      const p = pieceAt(view.focus);
-      view.reveal(pX(m, p), pY(m, p), ui.viewport);
+    current: () => host.showCurrent(),
+    pieceinfo: async () => {
+      if (host.m) await host.showPieceInfo(host.m);
     },
     citylist: async () => {
       const m = host.m;
