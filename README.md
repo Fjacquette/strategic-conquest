@@ -33,6 +33,7 @@ emulator on thousands of random cases (differential tests in `tools/emu/`).
 | `docs/findings.md` | What is known about the 3.01 binary: segments, compiler, randomness, resources |
 | `docs/save-format.md` | Save-file structure, as mapped so far |
 | `docs/versions.md` | 2.055 vs 3.01 comparison |
+| `docs/network.md` | The original's AppleTalk Master/Slave design |
 | `docs/quirks.md` | Bugs, exploits and version differences awaiting a reproduce/fix decision |
 | `docs/rules/` | Game rules recovered from the code, one file per subsystem |
 | `tools/analysis/` | Resource-fork, disassembly, cross-reference and comparison scripts |

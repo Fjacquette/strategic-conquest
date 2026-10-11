@@ -15,7 +15,7 @@ production times and Army moves were also confirmed in the running game.
 | 2 | AppleTalk Master |
 | 3 | AppleTalk Slave |
 
-Modes 2 and 3 are inferred from the network code. Choosing a two-player mode sets skill
+Modes 2 and 3 are confirmed from the network code ([network.md](../network.md)). Choosing a two-player mode sets skill
 to 4 and hides the skill slider.
 
 ## Unit table
@@ -43,7 +43,8 @@ Routines: moves `CODE 4 + 0x11BA`, build days `CODE 1 + 0x021C`, new piece
 | Repair in port per day | +1 | **+2** (modes 1 and 2 only) |
 | Bomber blast radius divisor | 70 | **35** (modes 1 and 2 only) |
 
-Aircraft moves are not doubled. See quirk Q7 about modes 2 and 3 differing.
+Aircraft moves are not doubled. In an AppleTalk game all of these are applied by the Master
+(mode 2) to both players; the Slave (mode 3) runs no rules ([network.md](../network.md)).
 
 ## Production
 
