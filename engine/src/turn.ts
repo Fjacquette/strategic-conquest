@@ -431,7 +431,7 @@ export function moveBomber(m: Mem, host: Host, p: number, player: number, idx: n
     const seen2 = explore(m, p, x, y, 2);
     host.report(m, { kind: 3, radius: pRadius(m, p), pos: req.pos });
     req.index = idx;
-    req.code = RequestCode.BOMBER_ATTACK;
+    req.code = RequestCode.SHOW_POSITION;
     host.request(m, req, reply);
     if (player !== m.sb(LOCAL_PLAYER)) host.event(m, "sound", { id: 2 });
     req.flag = 0;

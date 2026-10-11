@@ -13,15 +13,13 @@ import {
   GAME_MODE, LOCAL_PLAYER, NET_TURN, OPPONENT_OF, OWN_CITY_CODE, PIECE_COUNT, PLAYER_MAP_SIZE, PRNG_SEED,
   REGION_START, VIEW_PLAYER,
 } from "./globals.ts";
-import { type Host, messageA, Reply, Request, RequestCode } from "./host.ts";
+import { CLEAR_LINE, type Host, messageA, Reply, Request, RequestCode } from "./host.ts";
 import { inSet, playerMap, setTerrain, terrainNear } from "./map.ts";
 import { enemyAdjacent } from "./query.ts";
 import { pieceAt, pOwner, pSpotted, pType, pX, pY, setAttacks, setMoved, setOwner, setSpotted, setStep } from "./piece.ts";
 import { playerTurn } from "./turn.ts";
 import { cityRec } from "./units.ts";
 
-/** The empty message (STR 1013), which clears a message line. */
-const CLEAR_LINE = 0xffff03f5;
 /** "day # ^0" (STR 1021). */
 const DAY_MESSAGE = 1021;
 /** Game modes with end-of-game checks in the day loop (not the network game). */

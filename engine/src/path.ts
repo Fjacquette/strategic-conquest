@@ -25,8 +25,8 @@ export interface Dir {
 }
 
 // Scratch globals written by the path finder.
-const PATH_STEP_X = -0x5142; // word: last direction chosen
-const PATH_STEP_Y = -0x5140;
+export const PATH_STEP_X = -0x5142; // word: last direction chosen
+export const PATH_STEP_Y = -0x5140;
 const PATH_DECIDED = -0x513b; // byte: the last detour choice was not a coin toss
 const PATH_SIM_STEPS = -0x513a; // word: steps of the chosen simulated detour
 

@@ -13,6 +13,10 @@
  *   8-9   piece index
  *   10    flag (codes 21/22: the piece is visible to the local player)
  *
+ * A production request (code 6) is answered in byte 2, the type chosen. A password request
+ * (code 24) carries the password in bytes 2-7 (a Pascal string of up to 5 characters); byte
+ * 8 is 1 to set it, 0 to check it.
+ *
  * Fields a request does not set keep whatever the record held before; the engine keeps one
  * record per caller frame, as the original does, so they match.
  */
@@ -30,10 +34,11 @@ export const RequestCode = {
   BATTLE: 16,
   HIDE_MAP: 17,
   BOMBER_BLAST_DONE: 18,
-  BOMBER_ATTACK: 19,
+  SHOW_POSITION: 19,
   TURN_START: 20,
   STEP_DONE: 21,
   STEP_DONE_NOTEWORTHY: 22,
+  PASSWORD: 24,
 } as const;
 
 export class Request {
@@ -82,6 +87,9 @@ export interface Message {
   wait: number;
 }
 
+/** The empty message (STR 1013, no number), which clears a message line. */
+export const CLEAR_LINE = 0xffff03f5;
+
 /** CODE 1 + 0x3520: message from a long (number << 16 | id). */
 export function messageA(m: Mem, host: Host, msg: number, line: number, player: number, all: number, wait: number): void {
   host.message(m, { id: msg & 0xffff, subst1: (msg << 0) >> 16, subst2: -1, line, player, all, wait });
@@ -109,6 +117,13 @@ export interface Host {
   aiPlan(m: Mem): void;
   /** CODE 1 + 0x0626: the computer opponent handles a piece just built in city `city`. */
   aiNewPiece(m: Mem, city: number): void;
+  /** CODE 2 + 0x2E3A: the computer opponent's start-of-game analysis of the world (game mode 0). */
+  aiNewGame(m: Mem): void;
+  /**
+   * CODE 2 + 0x24DE: the computer opponent's start-of-game set-up for the side whose data is
+   * current; called for each side, the sides being swapped in between.
+   */
+  aiNewSide(m: Mem): void;
   /** The clock (ReadDateTime: seconds since 1904) that reseeds the game PRNG each day. */
   dateTime(m: Mem): number;
 }

@@ -17,6 +17,9 @@ import { playerTurn } from "../src/turn.ts";
 import { buildPiece, movesPerDay, productionDays } from "../src/units.ts";
 import { DayLoop, defeated, endChecks, handOffNeeded, runDay, spottedDecay, swapSides } from "../src/day.ts";
 import * as orders from "../src/orders.ts";
+import { coastalCity, generateMap, inlandCity, islandOutline, placeCity, scatterCities } from "../src/mapgen.ts";
+import { putLine, Region } from "../src/quickdraw.ts";
+import { clearPlayerMaps, clearTables, newGame, startingCities } from "../src/newgame.ts";
 import { Reply, Request } from "../src/host.ts";
 import { TestHost, type Action } from "./testhost.ts";
 
@@ -97,6 +100,35 @@ export const registry: Record<string, Fn> = {
   openProduction: (m, [x, y, owner, captured]) => {
     const d = orders.openProduction(m, x, y, owner, !!captured);
     return [d.city, d.type, d.days];
+  },
+  generateMap: (m) => generateMap(m),
+  islandOutline: (m, [cx, cy, size, roughness]) => islandOutline(m, cx, cy, size, roughness),
+  placeCity: (m, [x, y]) => (placeCity(m, x, y) ? 1 : 0),
+  coastalCity: (m, [island]) => (coastalCity(m, island) ? 1 : 0),
+  inlandCity: (m, [top, left, bottom, right, island]) => (inlandCity(m, { top, left, bottom, right }, island) ? 1 : 0),
+  scatterCities: (m) => scatterCities(m),
+  putLine: (_m, [h1, v1, h2, v2]) => {
+    const out: number[] = [];
+    putLine(out, h1, v1, h2, v2);
+    return out;
+  },
+  outlineRegion: (_m, [outline]) => {
+    const r = Region.fromOutline(outline);
+    const b = r.bbox();
+    return [r.points, [b.top, b.left, b.bottom, b.right]];
+  },
+  clearTables: (m) => clearTables(m),
+  clearPlayerMaps: (m) => clearPlayerMaps(m),
+  startingCities: (m, [player, cityA, cityB, production, ignore], log) => {
+    const host = new TestHost([], log, ignore ?? []);
+    host.production = production;
+    startingCities(m, host, player, cityA, cityB);
+  },
+  newGame: (m, [clock, production, ignore], log) => {
+    const host = new TestHost([], log, ignore ?? []);
+    host.clock = clock;
+    host.production = production;
+    newGame(m, host);
   },
   runDay: (m, [actions, clock, decided, firstHandoff], log) => {
     const host = new TestHost(actions as Action[], log);

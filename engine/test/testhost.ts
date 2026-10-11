@@ -9,14 +9,22 @@
  *   ["defer"]              defer the piece (PIECE_DEFERRED)
  *   ["done"]               end the piece's moves (PIECE_DONE)
  * When the list runs out, the reply is (0, 0).
+ *
+ * A production request (code 6) takes the next type from `production`, if any; a request to
+ * set a password (code 24) is answered with testPassword(player).
  */
 import { Mem } from "../src/mem.ts";
 import { PIECE_DEFERRED, PIECE_DONE } from "../src/globals.ts";
-import type { Host, Message, Reply, Request } from "../src/host.ts";
+import { RequestCode, type Host, type Message, type Reply, type Request } from "../src/host.ts";
 import { setDestination } from "../src/moveops.ts";
 import { pieceAt, setState } from "../src/piece.ts";
 
 export type Action = [string, ...number[]];
+
+/** The password a test controller gives for `player`: a Pascal string in 6 bytes. */
+export function testPassword(player: number): number[] {
+  return [3, 0x50, 0x57, 0x30 + player, 0, 0];
+}
 
 export class TestHost implements Host {
   private next = 0;
@@ -43,6 +51,9 @@ export class TestHost implements Host {
     return h;
   }
 
+  /** Production choices, one per production request. */
+  production: number[] = [];
+
   /** Request number (counting all requests) at which to log a full globals snapshot. */
   snapAt = -1;
   private count = 0;
@@ -50,6 +61,8 @@ export class TestHost implements Host {
   request(m: Mem, req: Request, reply: Reply): void {
     if (this.count++ === this.snapAt) this.log.push(["snap", Buffer.from(m.u8).toString("base64")]);
     this.log.push(["req", Array.from(req.rec), this.digest(m)]);
+    if (req.code === RequestCode.PASSWORD && req.rec[8] === 1) req.rec.set(testPassword(req.player), 2);
+    if (req.code === RequestCode.PRODUCTION && this.production.length > 0) req.ptype = this.production.shift()!;
     if (req.code !== 5) return;
     const a = this.actions[this.next++] ?? ["dir", 0, 0];
     const p = pieceAt(req.index);
@@ -104,6 +117,14 @@ export class TestHost implements Host {
 
   aiNewPiece(_m: Mem, city: number): void {
     this.log.push(["aiNewPiece", city]);
+  }
+
+  aiNewGame(_m: Mem): void {
+    this.log.push(["aiNewGame"]);
+  }
+
+  aiNewSide(_m: Mem): void {
+    this.log.push(["aiNewSide"]);
   }
 
   /** Value returned for the clock. */

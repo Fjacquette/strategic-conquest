@@ -42,7 +42,7 @@ emulator on thousands of random cases (differential tests in `tools/emu/`).
 | `docs/rules/` | Game rules recovered from the code, one file per subsystem |
 | `tools/analysis/` | Resource-fork, disassembly, cross-reference and comparison scripts |
 | `tools/save/sc3save.py` | Save-file reader: text dump and map rendering |
-| `engine/` | The game engine in TypeScript: state layout, the day loop, movement, players' orders, combat, units, path finding (`engine/src`); bridge used by the tests (`engine/test`) |
+| `engine/` | The game engine in TypeScript: state layout, map generation and a new game, the day loop, movement, players' orders, combat, units, path finding (`engine/src`); bridge used by the tests (`engine/test`) |
 | `tools/emu/` | Harness that runs the original routines on an emulated 68040, and differential tests of the engine against them |
 | `tools/extract.sh` | Unpacks the game archive into `build/sc301.rsrc` |
 | `emulator/` | Headless Basilisk II setup and control scripts |
@@ -68,6 +68,9 @@ tools/extract.sh                                   # writes build/sc301.rsrc
 python3 -I tools/emu/test_day.py 100              # whole days: original code vs the engine
 python3 -I tools/emu/test_turn.py 500             # whole turns
 python3 -I tools/emu/test_orders.py 100           # players' commands
+python3 -I tools/emu/test_mapgen.py 50            # map generation
+python3 -I tools/emu/test_savemaps.py saves/3.01/*.sav   # worlds of real games, from their seeds
+python3 -I tools/emu/test_newgame.py 20           # starting a new game
 python3 -I tools/emu/test_battle.py               # also test_hash, test_tools, test_path, test_units
 python3 -I tools/analysis/codeinfo.py build/sc301.rsrc
 python3 -I tools/save/sc3save.py dump saves/3.01/s04-day58-autoplay.sav

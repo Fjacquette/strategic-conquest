@@ -75,6 +75,22 @@ export function resolveCombat(m: Mem, a: number, b: number, keys: ReadonlySet<nu
   return m.sb(COMBAT_TABLE + (die - 1) * 8 + col - 1);
 }
 
+/**
+ * CODE 2 + 0x0004: the combat results table, a row of 8 bytes per die roll with columns 1-7
+ * used: 0 the attacker wins, 1 the attacker loses, 2 the attack is repelled.
+ */
+export function initCombatTable(m: Mem): void {
+  const rows = [
+    [1, 1, 1, 1, 1, 2, 2],
+    [1, 1, 1, 1, 2, 2, 0],
+    [1, 1, 1, 2, 2, 0, 0],
+    [1, 1, 2, 2, 0, 0, 0],
+    [1, 2, 2, 0, 0, 0, 0],
+    [1, 2, 0, 0, 0, 0, 0],
+  ];
+  rows.forEach((row, die) => m.bytes(COMBAT_TABLE + die * 8, 7).set(row));
+}
+
 /** CODE 3 + 0x0332: destroy piece `idx`, then restore `ownerSrc`'s owner bits. */
 function killKeepOwner(m: Mem, ownerSrc: number, idx: number): void {
   const owner = pOwner(m, ownerSrc);

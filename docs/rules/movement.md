@@ -213,16 +213,17 @@ interface for display.
 | 3 | Before each step | — |
 | 4 | An attack on an own piece, or an Army entering a neutral city | — |
 | 5 | A piece needs a direction | (dx, dy); or the controller changes the piece's orders |
-| 6 | A captured city needs a production choice | — (the city is updated) |
+| 6 | A city needs a production choice (after a capture, or a starting city) | The type chosen (the city is updated) |
 | 8 | Hand-off screen (two players on one Mac; [day.md](day.md)) | — |
 | 15 | Show the map (after a hand-off) | — |
 | 16 | A battle, or an Army entering an enemy city | — |
 | 17 | Hide the map (before a hand-off) | — |
 | 18 | A Bomber blast finished | — |
-| 19 | A Bomber attack begins | — |
+| 19 | Show a position: the player's map scrolls to it (a Bomber attack begins, or a starting city) | — |
 | 20 | Start of the player's turn | — |
 | 21 | A step finished | — |
 | 22 | A step finished with something noteworthy (new territory, an enemy, a ship moving), a piece was destroyed, or a spotted piece faded from view | — |
+| 24 | Set or check the player's password (two-player games) | The password, when setting it |
 
 The controller can also end a piece's moves for the day or defer it to a later sweep. A
 human player's commands are in [orders.md](orders.md).

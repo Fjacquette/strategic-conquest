@@ -130,10 +130,13 @@ are back at their starting state.
 
 ## Map generation uses QuickDraw regions
 
-Map generation (`CODE 2 + 0x179C` and the setup around it) builds island shapes with
-QuickDraw region and polygon calls (`OpenRgn`/`LineTo`/`CloseRgn`, `UnionRgn`, `EmptyRgn`,
-`OpenPoly`). Reproducing the original maps exactly would require reproducing QuickDraw's
-region rules. Not yet investigated further.
+Map generation (`CODE 2 + 0x1CDC`) builds island shapes with QuickDraw polygon and region
+calls (`OpenPoly`, `OpenRgn`/`LineTo`/`CloseRgn`, `SectRgn`, `UnionRgn`, `EmptyRgn`,
+`PtInRgn`), so exact maps need QuickDraw's region rules. The engine reimplements the part it
+uses (`engine/src/quickdraw.ts`): line-to-region conversion as in Apple's QuickDraw source
+(`PutLine`), with `FixRatio` truncating toward zero as in the Mac IIci ROM. Worlds
+regenerated from the seeds of saved games match the originals exactly. See
+[rules/mapgen.md](rules/mapgen.md).
 
 ## Resources
 

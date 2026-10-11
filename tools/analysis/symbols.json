@@ -231,6 +231,54 @@
   "-0x1208": [
    "player_map_scratch",
    642
+  ],
+  "-0x2CE4": [
+   "passwords",
+   12
+  ],
+  "-0x1E36": [
+   "island_polys",
+   60
+  ],
+  "-0x1E3A": [
+   "cities_made",
+   2
+  ],
+  "-0x1E44": [
+   "home_island_1",
+   10
+  ],
+  "-0x1E4E": [
+   "home_island_2",
+   10
+  ],
+  "-0x1E50": [
+   "island_count",
+   1
+  ],
+  "-0x2D06": [
+   "island_centers",
+   32
+  ],
+  "-0x3692": [
+   "island_adjacent",
+   32
+  ],
+  "-0x386E": [
+   "island_cities",
+   16
+  ],
+  "-0x1C8E": [
+   "ai_limit_10",
+   2
+  ],
+  "-0x1C90": [
+   "ai_limit_8",
+   2
+  ],
+  "-0x1604": [
+   "net_packet",
+   28
   ]
  },
  "functions": {
@@ -367,6 +415,37 @@
   "5:0x4EBC": "HumanMouseDown",
   "1:0x27BC": "NextEvent",
   "10:0x1490": "SlaveMain",
-  "10:0x0CB0": "SlaveReceive"
+  "10:0x0CB0": "SlaveReceive",
+  "2:0x00EA": "ClearTables",
+  "2:0x0558": "ClearIslandCities",
+  "2:0x05D4": "Sin100",
+  "2:0x0630": "IslandOutline",
+  "2:0x07B4": "OutlineRegion",
+  "2:0x0820": "RegionsOverlap",
+  "2:0x0850": "MarkIslandNeighbours",
+  "2:0x0B08": "RasterizeIsland",
+  "2:0x0C7E": "RandomCellInQuarter",
+  "2:0x0D34": "TerrainNextTo",
+  "2:0x0F48": "PlaceCity",
+  "2:0x1038": "CoastalCity",
+  "2:0x11E2": "CoastalCities",
+  "2:0x122C": "InlandCity",
+  "2:0x135E": "InlandCities",
+  "2:0x1466": "ScatterCities",
+  "2:0x152A": "HomeIsland",
+  "2:0x163C": "OtherIsland",
+  "2:0x1768": "GiveStartingCities",
+  "2:0x179C": "HomeIslandTable",
+  "2:0x1CDC": "GenerateMap",
+  "2:0x20B0": "ClearPlayerMaps",
+  "2:0x24C8": "NewGameSeed",
+  "2:0x2ACC": "SetupDialog",
+  "2:0x2C20": "NewGame",
+  "2:0x319E": "PasswordDialog",
+  "10:0x0004": "StartingCities",
+  "10:0x093C": "StartNewGame",
+  "1:0x0572": "CreateCity",
+  "1:0x2F94": "ZoomToMapIfShown",
+  "1:0x1628": "SetUpControllers"
  }
 }
