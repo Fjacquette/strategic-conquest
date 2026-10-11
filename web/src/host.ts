@@ -5,21 +5,24 @@
  * (CODE 5 + 0x5CBA): a computer player's direction and production requests to the computer
  * opponent, everything else to the human controller, which shows it on the map, plays the
  * sounds and, for a direction request, takes the player's commands until one answers it.
+ * Showing a fight also changes the game, as in the original: the attacker becomes spotted,
+ * and an Army's fight draws a number from QuickDraw's generator (see docs/interface.md).
  * The computer opponent is not ported yet: its pieces stay where they are.
  */
 import { Mem } from "../../engine/src/mem.ts";
 import {
-  ARMY, DAY, EMPTY, LOCAL_PLAYER, MOVES_LEFT, OPPONENT_OF, OWN_CITY_CODE, PIECE_DONE, REMOVED, WATER,
+  ARMY, BOMBER, DAY, FIGHTER, GAME_MODE, LOCAL_PLAYER, MOVES_LEFT, OPPONENT_OF, OWN_CITY_CODE, PIECE_DONE, WATER,
 } from "../../engine/src/globals.ts";
 import { type Host, type Message, Reply, Request, RequestCode } from "../../engine/src/host.ts";
-import { isComputer, terrainNear } from "../../engine/src/map.ts";
+import { explored, isComputer, terrainNear } from "../../engine/src/map.ts";
 import * as orders from "../../engine/src/orders.ts";
-import { pieceAt, pOwner, pSpotted, pType, pX, pY } from "../../engine/src/piece.ts";
+import { pieceAt, pOwner, pRadius, pSpotted, pState, pType, pX, pY, setSpotted } from "../../engine/src/piece.ts";
 import { enemyAdjacent, foundEnemy } from "../../engine/src/query.ts";
+import { qdRandom } from "../../engine/src/random.ts";
 import { cityRec, productionDays } from "../../engine/src/units.ts";
 import { Input } from "./input.ts";
 import { CH, CW, MapView } from "./mapview.ts";
-import { Sound, soundFor } from "./sound.ts";
+import { BATTLE, BLAST, EXPLOSION, Sound } from "./sound.ts";
 import { Words } from "./text.ts";
 import { UI, type ProductionChoice } from "./ui.ts";
 
@@ -30,8 +33,12 @@ const SHIPS = [2, 3, 4, 5, 6];
 const FLASH_MS = 300;
 /** A step the player can see stays on screen this long. */
 const STEP_MS = 60;
+/** The system beep plays this long before the game goes on. */
+const BEEP_MS = 200;
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** The original's waits are counted in ticks, sixtieths of a second. */
+const ticks = (n: number) => delay((n * 1000) / 60);
 
 export class BrowserHost implements Host {
   private readonly ui: UI;
@@ -97,9 +104,16 @@ export class BrowserHost implements Host {
         this.redraw(m);
         return;
       case RequestCode.SHOW_POSITION:
-      case RequestCode.BATTLE:
         if (req.player === local) this.view.reveal(req.pos & 0xff, req.pos >> 8, this.ui.viewport);
         this.redraw(m);
+        return;
+      case RequestCode.CITY_REPELLED_OR_NEUTRAL:
+      case RequestCode.BATTLE:
+        this.view.reveal(req.pos & 0xff, req.pos >> 8, this.ui.viewport);
+        await this.battle(m, req);
+        return;
+      case RequestCode.BOMBER_BLAST_DONE:
+        await this.bomberBlast(m, req);
         return;
       case RequestCode.MOVED:
         this.view.noteMove(m, req.index, req.pos);
@@ -119,26 +133,85 @@ export class BrowserHost implements Host {
     }
   }
 
-  /** The sound for a step the player sees (CODE 5 + 0x5246). */
+  /**
+   * The sound of a step (CODE 5 + 0x5218), made only where the player can see it: on a
+   * square in view that he has explored, by a piece not aboard another. An Army sounds the
+   * battle beside a spotted enemy piece or an enemy city; otherwise it marches, if it is his
+   * own, without cutting off another sound. His Fighters, ships and Bombers sound their
+   * own, cutting off any other sound, but not the same sound for the same type of piece.
+   */
   private stepSound(m: Mem, req: Request): void {
     const local = m.sb(LOCAL_PLAYER);
+    const x = req.pos & 0xff, y = req.pos >> 8;
     const p = pieceAt(req.index);
-    const type = pType(m, p), owner = pOwner(m, p), x = pX(m, p), y = pY(m, p);
-    if (type === REMOVED || type === EMPTY) {
-      this.sound.play("LExplosion", true);
-    } else if (type === ARMY) {
+    if (!this.view.shows(x, y, this.ui.viewport) || !explored(m, local, x, y) || pState(m, p) >= 2) return;
+    const type = pType(m, p), owner = pOwner(m, p);
+    if (type === ARMY) {
       if (enemyAdjacent(m, req.index, owner, x, y)) {
-        if (pSpotted(m, pieceAt(foundEnemy(m))) !== 0) this.sound.play("LBattle", true);
-        else this.sound.play("LArmy", false);
+        if (pSpotted(m, pieceAt(foundEnemy(m))) !== 0) this.sound.play(BATTLE, true);
+        else this.sound.play(ARMY, false);
       } else if (terrainNear(m, x, y, 1 << m.sb(OWN_CITY_CODE + m.sb(OPPONENT_OF + owner)))) {
-        this.sound.play("LBattle", true);
+        this.sound.play(BATTLE, true);
       } else if (owner === local) {
-        this.sound.play("LArmy", false);
+        this.sound.play(ARMY, false);
       }
-    } else if (owner === local) {
-      const name = soundFor(type);
-      if (this.sound.done() || this.sound.current() !== name) this.sound.play(name, true);
+    } else if (owner === local && type >= FIGHTER && type <= BOMBER) {
+      if (this.sound.done() || this.sound.last() !== type) this.sound.play(type, true);
     }
+  }
+
+  /**
+   * A fight (CODE 17 + 0x0CC2), for a battle and for an attack on a city: the attacker
+   * becomes spotted, the explosion sounds and the square flashes four times. At the second
+   * flash an Army's fight changes to the battle sound (when the explosion has finished, or
+   * on a coin toss with QuickDraw's generator), and any other piece's explosion starts again.
+   */
+  private async battle(m: Mem, req: Request): Promise<void> {
+    const p = pieceAt(req.index);
+    if (pSpotted(m, p) === 0) setSpotted(m, p, 1);
+    const x = req.pos & 0xff, y = req.pos >> 8;
+    this.sound.play(EXPLOSION, true);
+    for (let flash = 1; flash <= 4; flash++) {
+      if (flash === 2) {
+        if (pType(m, p) === ARMY) {
+          if ((qdRandom(m) & 1) !== 0 || this.sound.done()) this.sound.play(BATTLE, true);
+        } else {
+          this.sound.play(EXPLOSION, true);
+        }
+      }
+      this.view.inverted = [x, y];
+      this.view.draw(m);
+      await ticks(4);
+      this.view.inverted = null;
+      this.view.draw(m);
+      await ticks(8);
+    }
+  }
+
+  /**
+   * A Bomber's blast (CODE 5 + 0x5BDA, CODE 17 + 0x0E56). The computer's blast is announced
+   * with a beep before and after the map scrolls to it. The blast's area is covered in dark
+   * gray for two seconds, with the explosion.
+   */
+  private async bomberBlast(m: Mem, req: Request): Promise<void> {
+    const x = req.pos & 0xff, y = req.pos >> 8;
+    const enemy = m.sb(GAME_MODE) === 0 && req.player !== m.sb(LOCAL_PLAYER);
+    if (enemy) await this.alert();
+    this.view.reveal(x, y, this.ui.viewport);
+    if (enemy) await this.alert();
+    this.view.blast = { x, y, radius: Math.max(1, pRadius(m, pieceAt(req.index))) };
+    this.sound.play(BLAST, true);
+    this.view.draw(m);
+    await ticks(121);
+    this.view.blast = null;
+    this.view.draw(m);
+  }
+
+  /** CODE 1 + 0x123E: the sound playing is cut off for the system beep. */
+  private async alert(): Promise<void> {
+    this.sound.stop();
+    this.sound.beep();
+    await delay(BEEP_MS);
   }
 
   /** The direction request: the player commands until one of the commands answers it. */
@@ -266,13 +339,21 @@ export class BrowserHost implements Host {
     this.ui.setLine(msg.line, this.words.message(msg));
   }
 
-  beep(_m: Mem, _player: number): void {
+  /** CODE 1 + 0x0928: a beep for a player at this computer. */
+  beep(m: Mem, player: number): void {
+    if (isComputer(m, player)) return;
+    this.sound.stop();
     this.sound.beep();
   }
 
   report(_m: Mem, _entry: Record<string, number>): void {}
 
-  event(_m: Mem, _name: string, _data: Record<string, number>): void {}
+  /** The engine's "sound" event is the system beep (CODE 1 + 0x123E). */
+  event(_m: Mem, name: string, _data: Record<string, number>): void {
+    if (name !== "sound") return;
+    this.sound.stop();
+    this.sound.beep();
+  }
 
   aiPlan(_m: Mem): void {}
 

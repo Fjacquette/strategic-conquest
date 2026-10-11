@@ -38,6 +38,7 @@ emulator on thousands of random cases (differential tests in `tools/emu/`).
 | `docs/save-format.md` | Save-file structure, as mapped so far |
 | `docs/versions.md` | 2.055 vs 3.01 comparison |
 | `docs/network.md` | The original's AppleTalk Master/Slave design |
+| `docs/interface.md` | What the original's interface does besides drawing: sounds, the fight and blast displays |
 | `docs/quirks.md` | Bugs, exploits and version differences awaiting a reproduce/fix decision |
 | `docs/rules/` | Game rules recovered from the code, one file per subsystem |
 | `tools/analysis/` | Resource-fork, disassembly, cross-reference and comparison scripts |

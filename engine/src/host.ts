@@ -118,7 +118,10 @@ export interface Host {
   beep(m: Mem, player: number): void;
   /** An entry for the battle summary (CODE 1 + 0x2140 and relatives). */
   report(m: Mem, entry: Record<string, number>): void;
-  /** Notifications for the user interface only (sounds, battle messages). */
+  /**
+   * Notifications for the user interface only. "sound": the system beep, which cuts off any
+   * sound playing (CODE 1 + 0x123E).
+   */
   event(m: Mem, name: string, data: Record<string, number>): void;
   /** CODE 7 + 0x11EA: the computer opponent plans (start of its turn, after each build). */
   aiPlan(m: Mem): void;

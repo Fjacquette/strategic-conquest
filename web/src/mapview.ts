@@ -26,6 +26,8 @@ const W = MAP_W * CW;
 const H = MAP_H * CH;
 export const RULER_TOP = 9;
 export const RULER_LEFT = 14;
+/** QuickDraw's dkGray pattern, which the Bomber's blast is drawn in. */
+const DK_GRAY = [0xdd, 0x77, 0xdd, 0x77, 0xdd, 0x77, 0xdd, 0x77];
 
 /** What a square shows, besides its terrain. */
 interface Occupant {
@@ -57,6 +59,10 @@ export class MapView {
   revealAll = false;
   /** The Land Grid option. */
   landGrid = true;
+  /** A square shown inverted: the battle display's flash. */
+  inverted: [number, number] | null = null;
+  /** A Bomber's blast being shown: its square and radius. */
+  blast: { x: number; y: number; radius: number } | null = null;
   scale = 2;
 
   constructor(canvas: HTMLCanvasElement, rulerTop: HTMLCanvasElement, rulerLeft: HTMLCanvasElement, assets: Assets) {
@@ -207,7 +213,33 @@ export class MapView {
     for (const [key, occ] of this.occupants(m)) {
       this.drawPiece(m, Math.floor(key / 100), key % 100, occ);
     }
+    if (this.blast) this.drawBlast(this.blast.x, this.blast.y, this.blast.radius);
+    if (this.inverted) this.invert(this.inverted[0], this.inverted[1]);
     this.ctx.putImageData(px.image, 0, 0);
+  }
+
+  /**
+   * A Bomber's blast (CODE 17 + 0x0E56): a disc in the dkGray pattern, centred on the
+   * square, with a radius of 16 pixels (a square's width) for each square of blast radius.
+   */
+  private drawBlast(x: number, y: number, radius: number): void {
+    const cx = (x - 1) * CW + CW / 2, cy = (y - 1) * CH + CH / 2, r = radius * CW;
+    const d = this.pixels.data;
+    for (let yy = Math.max(0, cy - r); yy < Math.min(H, cy + r); yy++) {
+      const row = DK_GRAY[yy & 7];
+      for (let xx = Math.max(0, cx - r); xx < Math.min(W, cx + r); xx++) {
+        const dx = xx + 0.5 - cx, dy = yy + 0.5 - cy;
+        if (dx * dx + dy * dy <= r * r) d[yy * W + xx] = (row >> (7 - (xx & 7))) & 1 ? COLOR.black : COLOR.white;
+      }
+    }
+  }
+
+  /** Square (x, y) in inverse colors, as QuickDraw's InvertRect leaves it. */
+  private invert(x: number, y: number): void {
+    const d = this.pixels.data;
+    for (let yy = (y - 1) * CH; yy < y * CH; yy++) {
+      for (let xx = (x - 1) * CW; xx < x * CW; xx++) d[yy * W + xx] ^= 0x00ffffff;
+    }
   }
 
   private drawTerrain(m: Mem, x: number, y: number): void {
@@ -325,6 +357,15 @@ export class MapView {
     const x = Math.floor((clientX - r.left) / (CW * this.scale)) + 1;
     const y = Math.floor((clientY - r.top) / (CH * this.scale)) + 1;
     return x >= 1 && x <= MAP_W && y >= 1 && y <= MAP_H ? [x, y] : null;
+  }
+
+  /** Whether square (x, y) lies wholly in the part of the map the viewport shows. */
+  shows(x: number, y: number, viewport: HTMLElement): boolean {
+    const s = this.scale;
+    const px = this.canvas.offsetLeft + (x - 1) * CW * s, py = this.canvas.offsetTop + (y - 1) * CH * s;
+    const { scrollLeft, scrollTop, clientWidth, clientHeight } = viewport;
+    return px >= scrollLeft + RULER_LEFT * s && px + CW * s <= scrollLeft + clientWidth &&
+      py >= scrollTop + RULER_TOP * s && py + CH * s <= scrollTop + clientHeight;
   }
 
   /** Scroll the viewport so that square (x, y) is in view, away from the edges. */
