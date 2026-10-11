@@ -64,9 +64,9 @@ function start(): void {
   input.attach(view, () => ui.modal);
   const sound = new Sound(A.sounds);
   const host = new BrowserHost(ui, view, input, words, sound);
-  const unlock = () => { void sound.unlock(); };
-  window.addEventListener("pointerdown", unlock, { once: true });
-  window.addEventListener("keydown", unlock, { once: true });
+  for (const type of ["pointerdown", "click", "touchend", "keydown"]) {
+    window.addEventListener(type, () => sound.unlock(), { capture: true });
+  }
 
   const applyScale = (s: number) => {
     view.setScale(s);

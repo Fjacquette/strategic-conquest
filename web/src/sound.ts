@@ -19,6 +19,14 @@ export function soundFor(type: number): SoundName {
 
 const LIMIT = 4;
 
+/** The bytes of a base64 data: URL. */
+function dataUrlBytes(url: string): ArrayBuffer {
+  const bin = atob(url.slice(url.indexOf(",") + 1));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
 export class Sound {
   enabled = true;
   private ctx: AudioContext | null = null;
@@ -30,17 +38,29 @@ export class Sound {
     this.sources = sources;
   }
 
-  /** Start audio (browsers allow it only after the player has clicked or pressed a key). */
-  async unlock(): Promise<void> {
-    if (this.ctx) return;
-    try {
-      this.ctx = new AudioContext();
-      for (const [name, url] of Object.entries(this.sources)) {
-        const data = await (await fetch(url)).arrayBuffer();
-        this.buffers.set(name as SoundName, await this.ctx.decodeAudioData(data));
+  /**
+   * Called from every click, tap and key press: browsers start audio only from one, and some
+   * (Safari) only from a click or a key, not from a pointer press.
+   */
+  unlock(): void {
+    if (!this.ctx) {
+      try {
+        this.ctx = new AudioContext();
+      } catch {
+        return;
       }
-    } catch {
-      this.ctx = null;
+      void this.load(this.ctx);
+    }
+    if (this.ctx.state !== "running") this.ctx.resume().catch(() => {});
+  }
+
+  private async load(ctx: AudioContext): Promise<void> {
+    for (const [name, url] of Object.entries(this.sources)) {
+      try {
+        this.buffers.set(name as SoundName, await ctx.decodeAudioData(dataUrlBytes(url)));
+      } catch {
+        // That sound stays silent.
+      }
     }
   }
 
@@ -56,6 +76,7 @@ export class Sound {
   /** Play `name`; while another sound plays, only if `force` (which cuts the other off). */
   play(name: SoundName, force: boolean): void {
     if (!this.enabled || !this.ctx) return;
+    if (this.ctx.state !== "running") this.ctx.resume().catch(() => {});
     if (!this.done()) {
       if (!force) return;
       this.stop();
