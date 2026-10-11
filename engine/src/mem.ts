@@ -75,6 +75,12 @@ export class Mem {
     const i = this.at(off);
     return this.u8.subarray(i, i + size);
   }
+
+  /** Copy `size` bytes from `from` to `to`. */
+  copy(to: number, from: number, size: number): void {
+    const i = this.at(from);
+    this.u8.copyWithin(this.at(to), i, i + size);
+  }
 }
 
 /** 16-bit two's-complement value. */

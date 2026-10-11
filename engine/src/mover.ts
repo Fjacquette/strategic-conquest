@@ -9,7 +9,7 @@
  */
 import { Mem } from "./mem.ts";
 import {
-  ARMY, BOMBER, CARRIER, FIGHTER, GAME_MODE, LOCAL_PLAYER, MOVES_LEFT, MOVE_STEP, NET_SYNC,
+  ARMY, AUTO_PLAY, BOMBER, CARRIER, FIGHTER, GAME_MODE, LOCAL_PLAYER, MOVES_LEFT, MOVE_STEP, NET_SYNC,
   OPPONENT_OF, OWN_CITY_CODE, PIECE_DEFERRED, REMOVED, STEP_FLAG_1A95, SUBMARINE, TRANSPORT, WATER,
 } from "./globals.ts";
 import { topPieceAt } from "./hash.ts";
@@ -23,8 +23,8 @@ import { explore } from "./explore.ts";
 import { killPiece } from "./table.ts";
 import { cityAt, cityRec, typeStrId } from "./units.ts";
 import {
-  pBit5, pCargo, pieceAt, pOwner, pPatrol, pSpotted, pState, pType, pX, pY, setCargo, setSpotted,
-  setState, setType,
+  pAttacks, pBit5, pCargo, pieceAt, pOwner, pPatrol, pSpotted, pState, pType, pX, pY, setAttacks,
+  setCargo, setSpotted, setState, setType,
 } from "./piece.ts";
 
 const AIRCRAFT = 0x82;
@@ -36,7 +36,6 @@ const ALL_TYPES = 0x00ff;
 // Display-related globals the movement code maintains.
 const SHOW_MOVE = -0x1a9c; // byte: the local player may see this move
 const STEP_NOTEWORTHY = -0x1a9a; // byte: the last step revealed something (or a battle in network play)
-const NET_VIEW = -0x120c; // byte: network play; visibility is judged for the local player
 
 export const enemyCity = (m: Mem, player: number) => m.sb(OWN_CITY_CODE + m.sb(OPPONENT_OF + player));
 export const ownCity = (m: Mem, player: number) => m.sb(OWN_CITY_CODE + player);
@@ -277,7 +276,7 @@ export function executeMove(m: Mem, host: Host, idx: number, player: number, p: 
   const fight = () => {
     // CODE 5 + 0x0676 (nested in the original)
     const spottedBefore = pSpotted(m, q);
-    m.setB(p + 10, (m.b(p + 10) & 0x3f) | ((((m.b(p + 10) >> 6) + 1) & 3) << 6));
+    setAttacks(m, p, pAttacks(m, p) + 1);
     req.player = m.sb(GAME_MODE) === 2 ? player : m.sb(LOCAL_PLAYER);
     req.pos = m.w(p + 6);
     explore(m, p, pX(m, p), pY(m, p), player);
@@ -376,7 +375,9 @@ export function executeMove(m: Mem, host: Host, idx: number, player: number, p: 
     movePiece(m, p, sx + dx, sy + dy, idx, dx);
     const noteworthy = explore(m, p, pX(m, p), pY(m, p), player) || inSet(STACK_SHIPS, pType(m, p));
     m.setB(NET_SYNC, 1);
-    if (m.b(NET_VIEW)) {
+    // Under Auto Play both sides are played by the computer, so whether the move is shown
+    // is judged for the local player.
+    if (m.b(AUTO_PLAY)) {
       const local = m.sb(LOCAL_PLAYER);
       m.setB(SHOW_MOVE, player === local || (explored(m, local, pX(m, p), pY(m, p)) && pSpotted(m, p) !== 0) ? 1 : 0);
     } else {

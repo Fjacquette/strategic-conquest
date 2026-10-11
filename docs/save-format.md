@@ -43,24 +43,26 @@ human player's current sight appear only on the right, because the game hides th
 | 10006 | 1 | A5-$1E71 | game_mode_2 | Same variable as offset 4, written again |
 | 10007 | 460 | A5-$385E | cities | City table, see below |
 | 10467 | 2 | A5-$388E | piece_count | Highest piece slot in use |
-| 10469 | 352 | A5-$1BFC | cur_islands | Per-island records for the player whose turn it is, see below |
-| 10821 | 352 | A5-$0F86 | oth_islands | Same, for the other player |
-| 11173 | 32 | A5-$1C4E | cur_1C4E | Current player: 16 words, one per island (cleared per island at setup). Meaning unknown |
-| 11205 | 32 | A5-$0CBC | oth_0CBC | Other player's copy |
-| 11237 | 46 | A5-$1C8C | cur_1C8C | Current player: 46 bytes (possibly one per city, 0–45). Meaning unknown |
-| 11283 | 46 | A5-$0C7C | oth_0C7C | Other player's copy |
-| 11329 | 16 | A5-$1C5E | cur_1C5E | Current player: 16 bytes (possibly one per island). Meaning unknown |
-| 11345 | 16 | A5-$0C20 | oth_0C20 | Other player's copy |
-| 11361 | 2 | A5-$1C02 | cur_1C02 | Current player word. Meaning unknown |
-| 11363 | 2 | A5-$0CC6 | oth_0CC6 | Other player's copy |
-| 11365 | 2 | A5-$1C2E | cur_1C2E | Current player word. Meaning unknown |
-| 11367 | 2 | A5-$0CC0 | oth_0CC0 | Other player's copy |
+| 10469 | 352 | A5-$1BFC | cur_islands | Computer opponent: per-island records for the side it plays, see below |
+| 10821 | 352 | A5-$0F86 | oth_islands | Same, for the other side |
+| 11173 | 32 | A5-$1C4E | cur_1C4E | Computer's side: 16 words, one per island (cleared per island at setup). Meaning unknown |
+| 11205 | 32 | A5-$0CBC | oth_0CBC | Other side's copy |
+| 11237 | 46 | A5-$1C8C | cur_1C8C | Computer's side: 46 bytes (possibly one per city, 0–45). Meaning unknown |
+| 11283 | 46 | A5-$0C7C | oth_0C7C | Other side's copy |
+| 11329 | 16 | A5-$1C5E | cur_1C5E | Computer's side: 16 bytes (possibly one per island). Meaning unknown |
+| 11345 | 16 | A5-$0C20 | oth_0C20 | Other side's copy |
+| 11361 | 2 | A5-$1C02 | cur_1C02 | Computer's side: word. Meaning unknown |
+| 11363 | 2 | A5-$0CC6 | oth_0CC6 | Other side's copy |
+| 11365 | 2 | A5-$1C2E | cur_1C2E | Computer's side: word. Meaning unknown |
+| 11367 | 2 | A5-$0CC0 | oth_0CC0 | Other side's copy |
 | 11369 | 12 | A5-$2CE4 | blk_2CE4 | Unknown; zero in all saves so far |
 
-**Current vs other player.** The game keeps one set of "current player" variables and a
-stored copy for the other player, and swaps them when the turn changes
-(`CODE 1 + 0x2C8C..0x2D6C`). The `cur_`/`oth_` blocks are those two sets as they stood
-when the save was written.
+**Computer's side vs other side.** The computer opponent keeps its working data for the
+side it plays (player 2) in the `cur_` blocks and a copy for the other side in the `oth_`
+blocks. The two are exchanged, together with the players' maps and the owners of every
+city and piece, only while Auto Play has the computer play player 1's turn
+(`CODE 1 + 0x2C48`, see [day](rules/day.md#auto-play)); between turns they are in their
+normal places.
 
 ## Terrain (offset 8, 2400 bytes)
 

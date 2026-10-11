@@ -20,7 +20,7 @@ import { explore } from "./explore.ts";
 import { qdRandom } from "./random.ts";
 import { enemyCity, opponent, orderStep, ownCity, stepExecutor } from "./mover.ts";
 import {
-  pCargo, pieceAt, pMoved, pOwner, pRadius, pSpotted, pState, pStep, pStrength, pType, pX, pY,
+  pAttacks, pCargo, pieceAt, pMoved, pOwner, pRadius, pSpotted, pState, pStep, pStrength, pType, pX, pY,
   setCargo, setMoved, setSpotted, setState, setStep, setStrength,
 } from "./piece.ts";
 
@@ -596,7 +596,7 @@ export function playerTurn(m: Mem, host: Host, player: number): void {
               break;
             }
           }
-          if (((m.b(p + 10) >> 6) & 3) >= 2) m.setW(MOVE_STEP, movesPerDay(m, pType(m, p), pStrength(m, p), i));
+          if (pAttacks(m, p) >= 2) m.setW(MOVE_STEP, movesPerDay(m, pType(m, p), pStrength(m, p), i));
           if (m.b(PIECE_DEFERRED)) {
             m.setB(ANY_DEFERRED, 1);
             setMoved(m, p, 0);

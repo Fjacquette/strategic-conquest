@@ -37,6 +37,15 @@ export const PIECE_DEFERRED = -0x120b; // byte: the piece's step is deferred to 
 export const FOUND_Y = -0x12fc; // byte: cell found by terrainNear()
 export const FOUND_X = -0x12fb;
 
+// ----- day loop -----
+export const AUTO_PLAY = -0x120c; // byte: the computer plays player 1's side
+export const AUTO_PLAY_REQUESTED = -0x120d; // byte: Auto Play menu choice, applied at the end of the day
+export const NET_TURN = -0x1c07; // byte: whose turn it is, for the network game
+export const VIEW_PLAYER = -0x29a; // byte: player whose view the map window shows
+export const CITIES_P1 = -0x138e; // word: player 1's cities, counted by defeated()
+export const CITIES_P2 = -0x138c; // word: player 2's cities
+export const AUTOSAVE_OFF = -0x1401; // byte: no save file yet, so no autosave
+
 // ----- random generators -----
 export const PRNG_SEED = -0x127c; // game PRNG (CODE 1 + 0x2AFA)
 export const QD_RANDSEED = -0x23a; // QuickDraw randSeed

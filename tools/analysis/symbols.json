@@ -197,8 +197,40 @@
    1
   ],
   "-0x120C": [
-   "net_view",
+   "auto_play",
    1
+  ],
+  "-0x120D": [
+   "auto_play_requested",
+   1
+  ],
+  "-0x1C07": [
+   "net_turn",
+   1
+  ],
+  "-0x029A": [
+   "view_player",
+   1
+  ],
+  "-0x138E": [
+   "cities_p1",
+   2
+  ],
+  "-0x138C": [
+   "cities_p2",
+   2
+  ],
+  "-0x1401": [
+   "autosave_off",
+   1
+  ],
+  "-0x0287": [
+   "deferred_new_game",
+   1
+  ],
+  "-0x1208": [
+   "player_map_scratch",
+   642
   ]
  },
  "functions": {
@@ -305,6 +337,22 @@
   "7:0x11EA": "AIPlan",
   "1:0x0626": "AINewPiece",
   "6:0x5102": "AIMoveChooser",
-  "6:0x4C72": "AIProduction"
+  "6:0x4C72": "AIProduction",
+  "1:0x170A": "MainLoop",
+  "1:0x158C": "HandOffNeeded",
+  "1:0x1328": "SpottedDecay",
+  "1:0x149A": "Defeated",
+  "1:0x2C48": "SwapSides",
+  "1:0x1474": "DayMessage",
+  "1:0x2590": "BattleSummary",
+  "1:0x26BC": "ClearBattleReports",
+  "1:0x2B82": "SaveMapView",
+  "1:0x2BB6": "RestoreMapView",
+  "1:0x11F2": "SoundDone",
+  "1:0x328C": "ErrorAlert",
+  "10:0x0920": "SaveGame",
+  "10:0x1562": "SurrenderDialog",
+  "10:0x1450": "NetTurnSync",
+  "5:0x5C96": "PumpEvents"
  }
 }

@@ -149,6 +149,7 @@ class Machine:
             0x24: self._set_handle_size,
             0x2E: self._block_move,     # BlockMove
             0x3B: self._os_ok,          # Delay
+            0x32: self._os_ok,          # FlushEvents
         }
 
     def _d0(self, v=None):

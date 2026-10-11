@@ -116,8 +116,8 @@ player-2 ships at the map edge; the game PRNG also breaks ties in path finding.
 
 ### Other day-loop behavior noted
 
-- At `CODE 1 + 0x199A`, something happens on every third day after day 20
-  (`day mod 3 = 0 and day > 20`). Not yet identified.
+- The check at `CODE 1 + 0x199A` (every third day after day 20, or every day after day 10
+  in two-player games) is the autosave. See [rules/day.md](rules/day.md).
 
 ## Loading a saved game
 

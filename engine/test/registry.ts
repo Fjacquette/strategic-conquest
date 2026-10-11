@@ -15,6 +15,7 @@ import { gameRandom, qdRandom } from "../src/random.ts";
 import { attack, bomberBlast } from "../src/battle.ts";
 import { playerTurn } from "../src/turn.ts";
 import { buildPiece, movesPerDay, productionDays } from "../src/units.ts";
+import { DayLoop, defeated, endChecks, handOffNeeded, runDay, spottedDecay, swapSides } from "../src/day.ts";
 import { TestHost, type Action } from "./testhost.ts";
 
 type Fn = (m: Mem, args: any[], log: unknown[]) => unknown;
@@ -56,4 +57,23 @@ export const registry: Record<string, Fn> = {
     playerTurn(m, host, player);
   },
   gameRandom: (m) => gameRandom(m),
+  handOffNeeded: (m, [player]) => handOffNeeded(m, player),
+  defeated: (m, [player]) => defeated(m, player),
+  swapSides: (m) => swapSides(m),
+  spottedDecay: (m, [owner], log) => spottedDecay(m, new TestHost([], log), owner),
+  endChecks: (m, [decided]) => {
+    const loop = new DayLoop();
+    loop.decided = !!decided;
+    const end = endChecks(m, loop);
+    return [end.p1Defeated, end.p2Surrenders, loop.decided];
+  },
+  runDay: (m, [actions, clock, decided, firstHandoff], log) => {
+    const host = new TestHost(actions as Action[], log);
+    host.clock = clock;
+    const loop = new DayLoop();
+    loop.decided = !!decided;
+    loop.firstHandoff = !!firstHandoff;
+    const end = runDay(m, host, loop);
+    return [end.p1Defeated, end.p2Surrenders, loop.decided, loop.firstHandoff];
+  },
 };

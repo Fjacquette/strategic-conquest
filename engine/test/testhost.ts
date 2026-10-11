@@ -105,4 +105,11 @@ export class TestHost implements Host {
   aiNewPiece(_m: Mem, city: number): void {
     this.log.push(["aiNewPiece", city]);
   }
+
+  /** Value returned for the clock. */
+  clock = 0;
+
+  dateTime(_m: Mem): number {
+    return this.clock;
+  }
 }

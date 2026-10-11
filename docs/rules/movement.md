@@ -5,8 +5,8 @@
 everything it calls: on thousands of random turns the whole game state, every controller
 request, message and beep match the original code run in the emulator harness
 (`tools/emu/test_turn.py`), apart from the user-interface routines and the computer
-opponent, which are stubbed. End-of-day processing and the computer opponent are not yet
-decoded.
+opponent, which are stubbed. The computer opponent is not yet decoded. What happens between
+the players' turns is in [day.md](day.md).
 
 Source: Mover segment (CODE 5). `PlayerTurn` (`CODE 5 + 0x42D4`) runs one player's turn.
 Per-type movers (`MoveArmy` `+0x2428`, `MoveFighter` `+0x349E`, `MoveBomber` `+0x2E50`,
@@ -214,11 +214,14 @@ interface for display.
 | 4 | An attack on an own piece, or an Army entering a neutral city | — |
 | 5 | A piece needs a direction | (dx, dy); or the controller changes the piece's orders |
 | 6 | A captured city needs a production choice | — (the city is updated) |
+| 8 | Hand-off screen (two players on one Mac; [day.md](day.md)) | — |
+| 15 | Show the map (after a hand-off) | — |
 | 16 | A battle, or an Army entering an enemy city | — |
+| 17 | Hide the map (before a hand-off) | — |
 | 18 | A Bomber blast finished | — |
 | 19 | A Bomber attack begins | — |
 | 20 | Start of the player's turn | — |
 | 21 | A step finished | — |
-| 22 | A step finished with something noteworthy (new territory, an enemy, a ship moving), or a piece was destroyed | — |
+| 22 | A step finished with something noteworthy (new territory, an enemy, a ship moving), a piece was destroyed, or a spotted piece faded from view | — |
 
 The controller can also end a piece's moves for the day or defer it to a later sweep.

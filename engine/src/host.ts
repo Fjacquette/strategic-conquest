@@ -25,7 +25,10 @@ export const RequestCode = {
   CITY_REPELLED_OR_NEUTRAL: 4,
   DIRECTION: 5,
   PRODUCTION: 6,
+  HANDOFF_SCREEN: 8,
+  SHOW_MAP: 15,
   BATTLE: 16,
+  HIDE_MAP: 17,
   BOMBER_BLAST_DONE: 18,
   BOMBER_ATTACK: 19,
   TURN_START: 20,
@@ -63,9 +66,11 @@ export class Reply {
 }
 
 /**
- * A message for a player: STR resource `id`, with up to two STR IDs substituted for ^0 and
- * ^1 (-1 for none). `player` sees it, or everyone when `all` is set. `line` and `wait` are
- * the original's display arguments (message line, and whether the message pauses).
+ * A message for a player: STR resource `id` with substitutions. From messageA, `subst1` is a
+ * number for ^0 (-1 for none) and `subst2` is -1. From messageB, `subst1` is a STR ID for ^0
+ * and `subst2` a number for ^1. `player` sees it, or everyone when `all` is set. `line` and
+ * `wait` are the original's display arguments (message line, and whether the message
+ * pauses).
  */
 export interface Message {
   id: number;
@@ -77,12 +82,12 @@ export interface Message {
   wait: number;
 }
 
-/** CODE 1 + 0x3520: message from a long (substitution << 16 | id). */
+/** CODE 1 + 0x3520: message from a long (number << 16 | id). */
 export function messageA(m: Mem, host: Host, msg: number, line: number, player: number, all: number, wait: number): void {
   host.message(m, { id: msg & 0xffff, subst1: (msg << 0) >> 16, subst2: -1, line, player, all, wait });
 }
 
-/** CODE 1 + 0x35E2: message with a second long (line << 16 | second substitution). */
+/** CODE 1 + 0x35E2: message from a long (STR ID << 16 | id) and a second long (line << 16 | number). */
 export function messageB(m: Mem, host: Host, msg: number, flags: number, player: number, all: number, wait: number): void {
   host.message(m, {
     id: msg & 0xffff, subst1: (msg << 0) >> 16, subst2: (flags << 16) >> 16, line: flags >>> 16, player, all, wait,
@@ -104,4 +109,6 @@ export interface Host {
   aiPlan(m: Mem): void;
   /** CODE 1 + 0x0626: the computer opponent handles a piece just built in city `city`. */
   aiNewPiece(m: Mem, city: number): void;
+  /** The clock (ReadDateTime: seconds since 1904) that reseeds the game PRNG each day. */
+  dateTime(m: Mem): number;
 }

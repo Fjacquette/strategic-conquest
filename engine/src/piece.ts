@@ -7,7 +7,7 @@
  *   4-5   point C (y, x)
  *   6-7   position (y, x)
  *   8-9   word: bits 0-4 move step, bits 5-9 fuel or cargo, bits 10-15 Bomber blast radius
- *   10    bits 0-3 type, bits 4-5 owner, bits 6-7 see b10hi
+ *   10    bits 0-3 type, bits 4-5 owner, bits 6-7 attacks made this day
  *   11    bit 0 patrol, bit 2 moved this day, bits 3-4 orders, bit 5, bits 6-7 state
  *   12    bits 0-4 strength, bit 5, bits 6-7 spotted
  *   13    repaired during this stay in port
@@ -27,7 +27,7 @@ export const pY = (m: Mem, p: number) => m.sb(p + 6);
 export const pX = (m: Mem, p: number) => m.sb(p + 7);
 export const pType = (m: Mem, p: number) => m.b(p + 10) & 0x0f;
 export const pOwner = (m: Mem, p: number) => (m.b(p + 10) >> 4) & 3;
-export const pB10hi = (m: Mem, p: number) => (m.b(p + 10) >> 6) & 3;
+export const pAttacks = (m: Mem, p: number) => (m.b(p + 10) >> 6) & 3;
 export const pStep = (m: Mem, p: number) => m.w(p + 8) & 0x1f;
 export const pCargo = (m: Mem, p: number) => (m.w(p + 8) >> 5) & 0x1f;
 export const pRadius = (m: Mem, p: number) => (m.w(p + 8) >> 10) & 0x3f;
@@ -49,6 +49,7 @@ function setWordBits(m: Mem, off: number, mask: number, shift: number, v: number
 
 export const setType = (m: Mem, p: number, v: number) => setBits(m, p + 10, 0x0f, 0, v);
 export const setOwner = (m: Mem, p: number, v: number) => setBits(m, p + 10, 3, 4, v);
+export const setAttacks = (m: Mem, p: number, v: number) => setBits(m, p + 10, 3, 6, v);
 export const setStep = (m: Mem, p: number, v: number) => setWordBits(m, p + 8, 0x1f, 0, v);
 export const setCargo = (m: Mem, p: number, v: number) => setWordBits(m, p + 8, 0x1f, 5, v);
 export const setPatrol = (m: Mem, p: number, v: number) => setBits(m, p + 11, 1, 0, v);
