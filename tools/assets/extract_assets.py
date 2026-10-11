@@ -5,11 +5,15 @@ in .gitignore).
 Usage: python3 -I tools/assets/extract_assets.py [build/sc301.rsrc] [web/assets/original]
 
 Writes:
+  assets.json     the bitmaps and patterns as numbers, for the web build: "bits" maps each
+                  BITS id to its 12 row words (16 pixels wide, most significant bit left),
+                  "pats" each PAT id to its 8 row bytes, "strings" each STR id to its text
   bits-<id>.png   the 39 BITS bitmaps (16 x 12, 1 bit: black pixels opaque, white transparent)
   pat-<id>.png    the PAT patterns (8 x 8)
   <name>.wav      the five sampled sounds ('snd ' format 2, 8-bit)
   sheet.png       every bitmap on one sheet, numbered, enlarged (for reference)
 """
+import json
 import os
 import struct
 import sys
@@ -69,6 +73,17 @@ def main(src, out):
     os.makedirs(out, exist_ok=True)
     black, clear = (0, 0, 0, 255), (0, 0, 0, 0)
     sheet = []
+    numbers = {"bits": {}, "pats": {}, "strings": {}}
+    for rid in sorted(rf[b"STR "].keys()):
+        d = rf[b"STR "][rid].data_raw
+        numbers["strings"][str(rid)] = d[1:1 + d[0]].decode("mac_roman")
+    for rid in sorted(rf[b"BITS"].keys()):
+        d = rf[b"BITS"][rid].data_raw
+        numbers["bits"][str(rid)] = list(struct.unpack(">12H", d[4:28]))
+    for rid in sorted(rf[b"PAT "].keys()):
+        numbers["pats"][str(rid)] = list(rf[b"PAT "][rid].data_raw[:8])
+    with open(os.path.join(out, "assets.json"), "w") as f:
+        json.dump(numbers, f)
     for rid in sorted(rf[b"BITS"].keys()):
         w, h, rows = bits_rows(rf[b"BITS"][rid].data_raw)
         png(os.path.join(out, f"bits-{rid}.png"), w, h, [[black if b else clear for b in r] for r in rows])

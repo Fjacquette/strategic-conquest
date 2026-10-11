@@ -2,7 +2,7 @@
  * The player's input, turned into commands and queued until the game asks for one: keys,
  * clicks, drags and double-clicks on the map, and the command buttons.
  */
-import { MapView } from "./view.ts";
+import { MapView } from "./mapview.ts";
 
 export type Command =
   | { kind: "dir"; dx: number; dy: number }

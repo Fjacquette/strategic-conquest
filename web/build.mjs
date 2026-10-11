@@ -2,10 +2,27 @@
  * Builds the game into one self-contained page: dist/play.html (a full HTML document) and
  * dist/artifact.html (the same page without the document wrapper, for hosts that add it).
  *
+ * The original game's artwork, sounds and words are embedded from assets/original/, which
+ * tools/assets/extract_assets.py writes from the owner's copy. A page built with them holds
+ * the owner's copy of those assets and is for the owner's own use.
+ *
  * Usage (from web/): npm run build
  */
 import { build } from "esbuild";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+
+async function originalAssets() {
+  const dir = "assets/original";
+  if (!existsSync(`${dir}/assets.json`)) return null;
+  const data = JSON.parse(await readFile(`${dir}/assets.json`, "utf8"));
+  data.sounds = {};
+  for (const f of await readdir(dir)) {
+    if (!f.endsWith(".wav")) continue;
+    data.sounds[f.slice(0, -4)] = `data:audio/wav;base64,${(await readFile(`${dir}/${f}`)).toString("base64")}`;
+  }
+  return data;
+}
 
 const result = await build({
   entryPoints: ["src/main.ts"],
@@ -16,7 +33,10 @@ const result = await build({
   write: false,
 });
 const js = result.outputFiles[0].text.replaceAll("</script", "<\\/script");
-const page = (await readFile("src/page.html", "utf8")).replace("<!-- APP -->", `<script>${js}</script>`);
+const found = await originalAssets();
+const assetScript = found ? `<script>window.SC_ASSETS=${JSON.stringify(found).replaceAll("</", "<\\/")};</script>\n` : "";
+if (!found) console.warn("assets/original/ not found: the page will ask for the original assets");
+const page = (await readFile("src/page.html", "utf8")).replace("<!-- APP -->", `${assetScript}<script>${js}</script>`);
 const doc = `<!doctype html>
 <html lang="en">
 <head>

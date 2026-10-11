@@ -1,217 +1,147 @@
 <title>Strategic Conquest</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=Saira+Stencil+One&display=swap">
 <style>
-/* Layout: a chart table at night. The map fills the room; a narrow instrument panel on the right. */
+/* A System 7 desktop: menu bar, one window holding the status strip and the map, classic dialogs. */
 :root {
-  color-scheme: dark;
-  --bg: #11181d;
-  --panel: #182229;
-  --raised: #1f2c35;
-  --line: #2d3d48;
-  --fg: #dde4df;
-  --muted: #8d9c9b;
-  --p1: #d9614f;
-  --p2: #e2b54c;
-  --focus: #f4f1e6;
-  --error: #ef8a7a;
-  --map-fog: #1b2329;
-  --map-sea: #2a4b6b;
-  --map-land: #6e8650;
-  --map-edge: #0c1115;
-  --map-grid: rgba(244, 241, 230, 0.07);
-  --map-ink: #0e1418;
-  --city-neutral: #c9cfc9;
-  --font-display: "Saira Stencil One", "Arial Narrow", Impact, sans-serif;
-  --font-body: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-  --font-data: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+  --desk: #7f7f7f;
+  --ink: #000000;
+  --paper: #ffffff;
+  --shade: #dddddd;
+  --dim: #8a8a8a;
+  --font-system: Chicago, Charcoal, "Geneva", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --font-small: Geneva, "Helvetica Neue", Arial, sans-serif;
 }
 html, body { height: 100%; }
 [hidden] { display: none !important; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font: 15px/1.45 var(--font-body);
-}
-.app {
-  height: 100%;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  padding-inline: 16px;
-  padding-block: 0 16px;
-  gap: 12px;
-  box-sizing: border-box;
-}
-.bar {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding-block: 12px 0;
-  flex-wrap: wrap;
-}
-.bar h1 {
-  margin: 0;
-  font: 400 26px/1 var(--font-display);
-  letter-spacing: 0.04em;
-  color: var(--focus);
-}
-#status { display: flex; gap: 14px; font: 600 14px/1 var(--font-data); font-variant-numeric: tabular-nums; }
-#status .day { color: var(--muted); }
-.p1 { color: var(--p1); }
-.p2 { color: var(--p2); }
-.board {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 16px;
-}
-.map-wrap {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--map-fog);
-}
-#map { display: block; cursor: crosshair; touch-action: none; }
-.side {
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.side section { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; }
-.side h3 {
-  margin: 0 0 8px;
-  font: 600 11px/1 var(--font-data);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-#piece h2 { margin: 0 0 8px; font: 600 20px/1.1 var(--font-body); }
-#piece dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; }
-#piece dt { color: var(--muted); }
-#piece dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
-.quiet { color: var(--muted); margin: 0; }
-.messages p { margin: 0; min-height: 1.45em; font-family: var(--font-data); font-size: 13px; }
-#hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
-.commands { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.commands button { text-align: left; }
-.commands kbd {
-  float: right;
-  font: 600 12px/1.6 var(--font-data);
-  color: var(--muted);
-}
-button {
-  font: 500 14px/1 var(--font-body);
-  color: var(--fg);
-  background: var(--raised);
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 8px 10px;
-  cursor: pointer;
-}
-button:hover { border-color: var(--muted); }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-button.primary { background: var(--focus); color: var(--map-ink); border-color: var(--focus); font-weight: 600; }
-.keys { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
-.keys li + li { margin-top: 4px; }
-.overlay {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  background: rgba(10, 14, 17, 0.72);
-}
-.card {
-  width: min(440px, 100%);
-  box-sizing: border-box;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.card h2 { margin: 0; font: 400 24px/1.1 var(--font-display); letter-spacing: 0.03em; text-wrap: balance; }
-.card p { margin: 0; }
-.card label { color: var(--muted); }
-.card input[type="password"] {
-  font: 600 18px/1 var(--font-data);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 8px 10px;
-}
-.card form { display: flex; flex-direction: column; gap: 10px; }
-.field { display: grid; grid-template-columns: auto 1fr 2ch; gap: 12px; align-items: center; }
-.field output { font: 600 16px/1 var(--font-data); text-align: right; }
-.actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-.error { color: var(--error); min-height: 1.45em; }
-.types { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.type { display: flex; align-items: center; gap: 8px; background: var(--raised); border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; }
-.type label { display: flex; justify-content: space-between; gap: 8px; flex: 1; color: var(--fg); }
-.type .days { font: 12px/1.4 var(--font-data); color: var(--muted); }
-.type input:disabled + label { opacity: 0.45; }
-@media (max-width: 760px) {
-  .board { grid-template-columns: minmax(0, 1fr); grid-template-rows: 60vh auto; }
-  .app { height: auto; min-height: 100%; }
-}
+body { margin: 0; background: var(--desk); color: var(--ink); font: 600 13px/1.25 var(--font-system); }
+.mac { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+
+/* Menu bar */
+.menubar { display: flex; align-items: stretch; gap: 2px; background: var(--paper); border-bottom: 1px solid var(--ink); padding-inline: 10px; height: 22px; }
+.menu { position: relative; }
+.menu .title { height: 100%; padding: 0 10px; border: 0; background: none; font: inherit; color: inherit; cursor: default; }
+.menu.open .title { background: var(--ink); color: var(--paper); }
+.menu .items { display: none; position: absolute; left: 0; top: 22px; z-index: 10; min-width: 230px; background: var(--paper); border: 1px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); padding: 2px 0; }
+.menu.open .items { display: block; }
+.items button { display: flex; width: 100%; justify-content: space-between; gap: 24px; border: 0; background: none; font: inherit; color: inherit; text-align: left; padding: 2px 12px 2px 22px; cursor: default; position: relative; }
+.items button:hover:not(:disabled), .items button:focus-visible { background: var(--ink); color: var(--paper); outline: none; }
+.items button:disabled { color: var(--dim); }
+.items button.checked::before { content: "\2713"; position: absolute; left: 7px; }
+.items hr { border: 0; border-top: 1px dotted var(--dim); margin: 3px 0; }
+.items kbd { font: inherit; }
+
+/* The window */
+.window { min-height: 0; margin: 4px; display: grid; grid-template-rows: auto auto 1fr; background: var(--paper); border: 1px solid var(--ink); box-shadow: 1px 1px 0 var(--ink); }
+.titlebar { height: 18px; display: grid; place-items: center; border-bottom: 1px solid var(--ink);
+  background: repeating-linear-gradient(to bottom, var(--paper) 0 2px, var(--ink) 2px 3px, var(--paper) 3px 4px) center / 100% 12px no-repeat, var(--paper); }
+.titlebar span { background: var(--paper); padding: 0 8px; }
+.strip { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; padding: 3px 8px 4px; border-bottom: 1px solid var(--ink); }
+.strip p { margin: 0; min-height: 1.25em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.turn { display: flex; align-items: center; gap: 8px; align-self: start; min-width: 140px; justify-content: flex-end; }
+canvas.icon { image-rendering: pixelated; image-rendering: crisp-edges; vertical-align: middle; }
+
+/* The map with its rulers */
+.viewport { position: relative; min-height: 0; overflow: auto; background: var(--ink); overscroll-behavior: contain; }
+.sheet { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; width: max-content; }
+.sheet canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+.corner { position: sticky; top: 0; left: 0; z-index: 3; background: var(--paper); border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); box-sizing: border-box; }
+#ruler-top { position: sticky; top: 0; z-index: 2; }
+#ruler-left { position: sticky; left: 0; z-index: 2; }
+#map { cursor: crosshair; touch-action: none; }
+
+/* Dialogs */
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; }
+.dialog { background: var(--paper); border: 1px solid var(--ink); outline: 2px solid var(--paper); box-shadow: 0 0 0 3px var(--ink), 3px 3px 0 3px var(--ink); padding: 14px 16px; max-width: min(640px, 100%); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; }
+.dialog p { margin: 0; }
+.dialog button { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--ink); border-radius: 8px; padding: 3px 16px; min-width: 90px; cursor: default; }
+.dialog button:active { background: var(--ink); color: var(--paper); }
+.dialog button.default { box-shadow: 0 0 0 1px var(--paper), 0 0 0 4px var(--ink); border-radius: 8px; }
+.dialog button:focus-visible { outline: 1px dotted var(--ink); outline-offset: 5px; }
+.dialog input[type="radio"] { accent-color: var(--ink); margin: 0 6px 0 0; }
+.setup { width: 250px; }
+.setup .modes { display: flex; flex-direction: column; gap: 4px; padding-left: 6px; }
+.setup .modes label { cursor: default; }
+.setup button { align-self: center; }
+.setup .skill { display: flex; flex-direction: column; align-items: center; gap: 4px; font-family: var(--font-small); font-weight: 400; }
+.setup .skill input { width: 100%; accent-color: var(--ink); }
+.production { width: 440px; }
+.production .head { border-bottom: 1px solid var(--ink); padding-bottom: 4px; font-family: var(--font-small); font-weight: 400; }
+.production .body { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+.production .types { display: flex; flex-direction: column; gap: 3px; font-family: var(--font-small); font-weight: 400; }
+.production .type { display: flex; align-items: center; }
+.production .type label { display: inline-grid; grid-template-columns: 24px 78px 22px auto; align-items: center; gap: 4px; white-space: nowrap; }
+.production .type.off { color: var(--dim); }
+.production .days { text-align: right; padding-right: 4px; }
+.production .side { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; }
+.production .preview { width: 96px; height: 72px; image-rendering: pixelated; border: 1px solid var(--ink); }
+.citylist { width: 520px; }
+.citylist .head { font-family: var(--font-small); font-weight: 400; display: flex; flex-direction: column; gap: 2px; }
+.citylist .head span { margin-left: 40px; }
+.citylist > button { align-self: flex-end; margin-top: -40px; }
+.citylist .scroll { max-height: 260px; overflow: auto; border: 1px solid var(--ink); }
+.citylist table { width: 100%; border-collapse: collapse; font: 400 12px/1.3 var(--font-small); font-variant-numeric: tabular-nums; }
+.citylist th { text-align: left; font-weight: 400; border-bottom: 1px solid var(--ink); padding: 2px 6px; position: sticky; top: 0; background: var(--paper); }
+.citylist td { padding: 2px 6px; white-space: nowrap; }
+.citylist tr:focus-visible, .citylist tbody tr:hover { background: var(--ink); color: var(--paper); outline: none; }
+.citylist .note { font: 400 11px/1.3 var(--font-small); color: var(--dim); }
+.worldmap { max-width: min(760px, 100%); flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+.worldmap canvas { width: min(480px, 100%); height: auto; border: 1px solid var(--ink); image-rendering: auto; }
+.worldmap .info { display: flex; flex-direction: column; gap: 4px; font-family: var(--font-small); font-weight: 400; }
+.notice { width: 340px; }
+.notice > button, .notice .buttons { align-self: flex-end; }
+.notice .buttons { display: flex; gap: 12px; }
+.missing { margin: 40px auto; max-width: 520px; background: var(--paper); border: 1px solid var(--ink); padding: 16px 20px; font-weight: 400; }
 </style>
 
-<div class="app">
-  <header class="bar">
-    <h1>Strategic Conquest</h1>
-    <span id="status"></span>
-  </header>
-  <main class="board">
-    <div class="map-wrap" id="map-wrap"><canvas id="map" aria-label="Map"></canvas></div>
-    <aside class="side">
-      <section aria-labelledby="piece-h">
-        <h3 id="piece-h">Piece</h3>
-        <div id="piece"><p class="quiet">Waiting for the next piece.</p></div>
-        <p id="hint"></p>
-      </section>
-      <section aria-labelledby="orders-h">
-        <h3 id="orders-h">Orders</h3>
-        <div class="commands" id="commands">
-          <button type="button" data-key="s">Sleep <kbd>S</kbd></button>
-          <button type="button" data-key="n">Skip <kbd>N</kbd></button>
-          <button type="button" data-key="b">Move later <kbd>B</kbd></button>
-          <button type="button" data-key="r">Random <kbd>R</kbd></button>
-          <button type="button" data-key="w">Wake <kbd>W</kbd></button>
-          <button type="button" data-key="l">Load <kbd>L</kbd></button>
-          <button type="button" data-key="p">Patrol <kbd>P</kbd></button>
-          <button type="button" data-key="m">Stack move <kbd>M</kbd></button>
-          <button type="button" data-key="a">Army dest. <kbd>A</kbd></button>
-          <button type="button" data-key="c">Air dest. <kbd>C</kbd></button>
-        </div>
-      </section>
-      <section class="messages" aria-labelledby="messages-h" aria-live="polite">
-        <h3 id="messages-h">Messages</h3>
-        <p id="line1"></p>
-        <p id="line2"></p>
-      </section>
-      <section aria-labelledby="keys-h">
-        <h3 id="keys-h">Moving</h3>
-        <ul class="keys">
-          <li>Keypad 1–9 or arrow keys: one square. Keypad 5: stay.</li>
-          <li>Click a square next to the piece to move there.</li>
-          <li>Drag from a piece to any square: go there.</li>
-          <li>Double-click your city: change what it builds.</li>
-        </ul>
-      </section>
-    </aside>
-  </main>
+<div class="mac" id="mac">
+  <nav class="menubar" id="menubar" aria-label="Menus">
+    <div class="menu"><button class="title" type="button">File</button><div class="items">
+      <button type="button" data-cmd="new">New Game…</button>
+      <button type="button" data-cmd="resume" disabled>Resume Game…</button>
+      <button type="button" data-cmd="save" disabled>Save</button>
+    </div></div>
+    <div class="menu"><button class="title" type="button">Moves</button><div class="items">
+      <button type="button" data-cmd="key:s">Sleep <kbd>S</kbd></button>
+      <button type="button" data-cmd="key:w">Wake <kbd>W</kbd></button>
+      <button type="button" data-cmd="key:l">Transport Load <kbd>L</kbd></button>
+      <button type="button" data-cmd="key:r">Random <kbd>R</kbd></button>
+      <button type="button" data-cmd="key:c">City Aircraft Destination <kbd>C</kbd></button>
+      <button type="button" data-cmd="key:a">Army Destination <kbd>A</kbd></button>
+      <button type="button" data-cmd="key:m">Stack Move <kbd>M</kbd></button>
+      <button type="button" data-cmd="key:p">Patrol <kbd>P</kbd></button>
+      <button type="button" data-cmd="key:n">Skip <kbd>N</kbd></button>
+      <button type="button" data-cmd="key:b">Move Later <kbd>B</kbd></button>
+    </div></div>
+    <div class="menu"><button class="title" type="button">Displays</button><div class="items">
+      <button type="button" data-cmd="current">Current Piece</button>
+      <button type="button" data-cmd="citylist">City List…</button>
+      <button type="button" data-cmd="worldmap">World Map…</button>
+      <button type="button" data-cmd="landgrid" class="checked">Land Grid</button>
+      <hr>
+      <button type="button" data-cmd="zoomin">Larger Map <kbd>+</kbd></button>
+      <button type="button" data-cmd="zoomout">Smaller Map <kbd>−</kbd></button>
+    </div></div>
+    <div class="menu"><button class="title" type="button">Options</button><div class="items">
+      <button type="button" data-cmd="sound" class="checked">Sound</button>
+      <button type="button" data-cmd="autoplay" disabled>Auto Play</button>
+      <button type="button" data-cmd="summary" disabled>Battle Summary</button>
+    </div></div>
+  </nav>
+  <section class="window" aria-label="Strategic Conquest">
+    <div class="titlebar"><span>Strategic Conquest</span></div>
+    <header class="strip">
+      <div class="lines" aria-live="polite"><p id="line1"></p><p id="line2"></p></div>
+      <div class="turn"><span id="turn"></span><span id="turn-icon"></span></div>
+    </header>
+    <div class="viewport" id="viewport">
+      <div class="sheet">
+        <div class="corner" id="corner"></div>
+        <canvas id="ruler-top"></canvas>
+        <canvas id="ruler-left"></canvas>
+        <canvas id="map" aria-label="Map"></canvas>
+      </div>
+    </div>
+  </section>
 </div>
-<div class="overlay" id="overlay" hidden><div class="card" id="card" role="dialog" aria-modal="true"></div></div>
+<div class="overlay" id="overlay" hidden><div class="dialog" id="dialog" role="dialog" aria-modal="true"></div></div>
 <!-- APP -->

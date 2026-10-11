@@ -1,177 +1,166 @@
 /**
- * The browser as the engine's host for two players sharing one device (game mode 1): the
- * human controller answers the engine's requests from the player's commands, shows
- * messages, and redraws the map as pieces move.
+ * The browser as the engine's host for a game against the computer (game mode 0).
+ *
+ * Requests go to the controller of the player they are for, as in the original
+ * (CODE 5 + 0x5CBA): a computer player's direction and production requests to the computer
+ * opponent, everything else to the human controller, which shows it on the map, plays the
+ * sounds and, for a direction request, takes the player's commands until one answers it.
+ * The computer opponent is not ported yet: its pieces stay where they are.
  */
 import { Mem } from "../../engine/src/mem.ts";
-import { DAY, LOCAL_PLAYER, MOVES_LEFT, WATER } from "../../engine/src/globals.ts";
-import { type Host, type Message, Reply, Request, RequestCode } from "../../engine/src/host.ts";
-import { terrainNear } from "../../engine/src/map.ts";
-import { PASSWORDS } from "../../engine/src/newgame.ts";
-import * as orders from "../../engine/src/orders.ts";
 import {
-  pBit5, pCargo, pieceAt, pOwner, pPatrol, pState, pStrength, pType, pX, pY,
-} from "../../engine/src/piece.ts";
-import { cityAt, cityRec, productionDays } from "../../engine/src/units.ts";
+  ARMY, DAY, EMPTY, LOCAL_PLAYER, MOVES_LEFT, OPPONENT_OF, OWN_CITY_CODE, PIECE_DONE, REMOVED, WATER,
+} from "../../engine/src/globals.ts";
+import { type Host, type Message, Reply, Request, RequestCode } from "../../engine/src/host.ts";
+import { isComputer, terrainNear } from "../../engine/src/map.ts";
+import * as orders from "../../engine/src/orders.ts";
+import { pieceAt, pOwner, pSpotted, pType, pX, pY } from "../../engine/src/piece.ts";
+import { enemyAdjacent, foundEnemy } from "../../engine/src/query.ts";
+import { cityRec, productionDays } from "../../engine/src/units.ts";
 import { Input } from "./input.ts";
-import { messageText } from "./text.ts";
+import { CH, CW, MapView } from "./mapview.ts";
+import { Sound, soundFor } from "./sound.ts";
+import { Words } from "./text.ts";
 import { UI, type ProductionChoice } from "./ui.ts";
-import { MapView } from "./view.ts";
 
 /** Seconds between 1904 (the Mac's epoch) and 1970. */
 const MAC_EPOCH = 2082844800;
 const SHIPS = [2, 3, 4, 5, 6];
-const FUEL_TYPES = [1, 7];
-const CARGO_TYPES = [4, 5];
-
-/** Hints shown while a command waits for a click or a drag. */
-const MODE_HINTS: Record<string, string> = {
-  w: "Wake: click a square.",
-  l: "Load: click your Transport.",
-  p: "Patrol: drag from the piece to the far end of the patrol.",
-  m: "Stack move: drag from the square to the destination.",
-  a: "Army destination: drag from your city to the destination.",
-  c: "Aircraft destination: drag from your city to the destination.",
-};
+/** The piece being moved flashes: this long on, then this long off. */
+const FLASH_MS = 300;
+/** A step the player can see stays on screen this long. */
+const STEP_MS = 60;
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
 export class BrowserHost implements Host {
-  /** The player at the device, as far as the screen is concerned. */
-  private present = 0;
-  private beeper: AudioContext | null = null;
   private readonly ui: UI;
   private readonly view: MapView;
   private readonly input: Input;
+  private readonly words: Words;
+  readonly sound: Sound;
+  /** The game, while one is being played (for menu commands). */
+  m: Mem | null = null;
+  /** The direction request being answered, if any. */
+  private current: { req: Request; reply: Reply } | null = null;
+  private drawPending = false;
 
-  constructor(ui: UI, view: MapView, input: Input) {
+  constructor(ui: UI, view: MapView, input: Input, words: Words, sound: Sound) {
     this.ui = ui;
     this.view = view;
     this.input = input;
+    this.words = words;
+    this.sound = sound;
   }
 
+  /** Redraw at the next frame. */
   redraw(m: Mem): void {
-    this.ui.setStatus(m.sw(DAY), m.sb(LOCAL_PLAYER));
-    this.view.draw(m);
+    if (this.drawPending) return;
+    this.drawPending = true;
+    requestAnimationFrame(() => {
+      this.drawPending = false;
+      this.view.draw(m);
+    });
   }
 
   async request(m: Mem, req: Request, reply: Reply): Promise<void> {
+    if (isComputer(m, req.player)) {
+      if (req.code === RequestCode.DIRECTION) {
+        // The computer opponent is not ported yet: its pieces stand still.
+        m.setB(PIECE_DONE, 1);
+        reply.dx = 0;
+        reply.dy = 0;
+        return;
+      }
+      if (req.code === RequestCode.PRODUCTION) return;
+      if (req.code === RequestCode.TURN_START) {
+        this.ui.setTurn(false, null);
+        this.redraw(m);
+        return;
+      }
+    }
+    await this.display(m, req, reply);
+  }
+
+  /** The human controller (CODE 5 + 0x51FE). */
+  private async display(m: Mem, req: Request, reply: Reply): Promise<void> {
+    const local = m.sb(LOCAL_PLAYER);
     switch (req.code) {
       case RequestCode.DIRECTION:
         await this.direction(m, req, reply);
         return;
       case RequestCode.PRODUCTION:
-        await this.production(m, req);
-        return;
-      case RequestCode.PASSWORD:
-        await this.password(m, req);
-        return;
-      case RequestCode.HANDOFF_SCREEN:
-        await this.handoff(m, req.player);
-        return;
-      case RequestCode.HIDE_MAP:
-        this.view.hidden = true;
-        this.redraw(m);
-        return;
-      case RequestCode.SHOW_MAP:
-        this.view.hidden = false;
-        this.view.viewer = m.sb(LOCAL_PLAYER);
-        this.redraw(m);
+        await this.production(m, req.pos & 0xff, req.pos >> 8, local, true).then((t) => { req.ptype = t; });
         return;
       case RequestCode.TURN_START:
-        this.view.viewer = m.sb(LOCAL_PLAYER);
+        this.ui.setTurn(req.player === local, null);
         this.redraw(m);
         return;
       case RequestCode.SHOW_POSITION:
-        if (req.player === this.view.viewer) this.view.reveal(req.pos & 0xff, req.pos >> 8, this.ui.mapWrap);
+      case RequestCode.BATTLE:
+        if (req.player === local) this.view.reveal(req.pos & 0xff, req.pos >> 8, this.ui.viewport);
+        this.redraw(m);
+        return;
+      case RequestCode.MOVED:
+        this.view.noteMove(m, req.index, req.pos);
         return;
       case RequestCode.STEP_DONE:
       case RequestCode.STEP_DONE_NOTEWORTHY:
-        // A step the viewer can see is shown briefly, so moves under orders can be followed.
-        if (req.flag && !this.view.hidden && req.player === this.view.viewer) {
+        if (req.flag) {
+          this.stepSound(m, req);
+          this.view.draw(m);
+          await delay(STEP_MS);
+        } else {
           this.redraw(m);
-          await delay(40);
         }
         return;
       default:
-        return;
+        this.redraw(m);
     }
   }
 
-  /** The device goes to `player` unless they already have it. */
-  private async passTo(m: Mem, player: number, text: string): Promise<void> {
-    if (this.present === player) return;
-    this.view.hidden = true;
-    this.redraw(m);
-    await this.ui.passTo(player, text);
-    this.present = player;
-    this.view.hidden = false;
-    this.view.viewer = player;
-    this.redraw(m);
-  }
-
-  private async handoff(m: Mem, player: number): Promise<void> {
-    this.present = 0;
-    await this.passTo(m, player, `Pass the device to player ${player} for their turn.`);
-    const stored = this.storedPassword(m, player);
-    if (stored) await this.ui.password(player, stored);
-  }
-
-  private storedPassword(m: Mem, player: number): string {
-    const at = PASSWORDS[player];
-    const len = Math.min(m.b(at), 5);
-    let s = "";
-    for (let i = 1; i <= len; i++) s += String.fromCharCode(m.b(at + i));
-    return s;
-  }
-
-  private async password(m: Mem, req: Request): Promise<void> {
-    if (req.rec[8] !== 1) return;
-    await this.passTo(m, req.player, `Player ${req.player} sets up first.`);
-    const value = await this.ui.password(req.player, null);
-    req.rec.fill(0, 2, 8);
-    req.rec[2] = value.length;
-    for (let i = 0; i < value.length; i++) req.rec[3 + i] = value.charCodeAt(i);
-  }
-
-  private async production(m: Mem, req: Request): Promise<void> {
-    const x = req.pos & 0xff, y = req.pos >> 8;
-    await this.passTo(m, req.player, `Player ${req.player} chooses what the city builds.`);
-    this.view.reveal(x, y, this.ui.mapWrap);
-    const dlg = orders.openProduction(m, x, y, req.player, true);
-    req.ptype = await this.chooseProduction(m, req.player, x, y, dlg);
-    this.redraw(m);
-  }
-
-  private async chooseProduction(m: Mem, player: number, x: number, y: number, dlg: orders.ProductionDialog): Promise<number> {
-    const coastal = terrainNear(m, x, y, 1 << WATER);
-    const choices: ProductionChoice[] = [0, 1, 2, 3, 5, 4, 6, 7].map((type) => ({
-      type, days: productionDays(m, type), allowed: coastal || !SHIPS.includes(type),
-    }));
-    const type = await this.ui.production(player, x, y, m.sb(cityRec(dlg.city) + 8), choices);
-    orders.chooseProduction(m, dlg, type);
-    return type;
+  /** The sound for a step the player sees (CODE 5 + 0x5246). */
+  private stepSound(m: Mem, req: Request): void {
+    const local = m.sb(LOCAL_PLAYER);
+    const p = pieceAt(req.index);
+    const type = pType(m, p), owner = pOwner(m, p), x = pX(m, p), y = pY(m, p);
+    if (type === REMOVED || type === EMPTY) {
+      this.sound.play("LExplosion", true);
+    } else if (type === ARMY) {
+      if (enemyAdjacent(m, req.index, owner, x, y)) {
+        if (pSpotted(m, pieceAt(foundEnemy(m))) !== 0) this.sound.play("LBattle", true);
+        else this.sound.play("LArmy", false);
+      } else if (terrainNear(m, x, y, 1 << m.sb(OWN_CITY_CODE + m.sb(OPPONENT_OF + owner)))) {
+        this.sound.play("LBattle", true);
+      } else if (owner === local) {
+        this.sound.play("LArmy", false);
+      }
+    } else if (owner === local) {
+      const name = soundFor(type);
+      if (this.sound.done() || this.sound.current() !== name) this.sound.play(name, true);
+    }
   }
 
   /** The direction request: the player commands until one of the commands answers it. */
   private async direction(m: Mem, req: Request, reply: Reply): Promise<void> {
     const player = m.sb(LOCAL_PLAYER);
     const p = pieceAt(req.index);
+    this.current = { req, reply };
     this.view.focus = req.index;
-    this.view.reveal(pX(m, p), pY(m, p), this.ui.mapWrap);
+    this.view.reveal(pX(m, p), pY(m, p), this.ui.viewport);
+    this.ui.setTurn(true, pType(m, p));
     let mode = "";
-    const show = () => {
-      this.ui.showPiece({
-        player: pOwner(m, p), type: pType(m, p), x: pX(m, p), y: pY(m, p), movesLeft: m.sw(MOVES_LEFT),
-        strength: pStrength(m, p), orders: describeOrders(m, p),
-        extra: FUEL_TYPES.includes(pType(m, p)) || CARGO_TYPES.includes(pType(m, p)) ? pCargo(m, p) : -1,
-      });
-      this.ui.setHint(MODE_HINTS[mode] ?? "Move with the keypad or arrow keys, click a square next to the piece, or drag to a destination.");
-      this.redraw(m);
+    const status = () => {
+      this.ui.setLine(1, this.words.pieceStatus(m, p, m.sw(MOVES_LEFT)));
+      if (mode) this.ui.setLine(2, this.words.str(MODE_HINTS[mode]));
     };
-    show();
-    await frame();
+    status();
+    this.view.flashOff = false;
+    this.view.draw(m);
+    const timer = setInterval(() => {
+      this.view.flashOff = !this.view.flashOff;
+      this.view.draw(m);
+    }, FLASH_MS);
     this.input.clear();
     this.input.enabled = true;
     try {
@@ -189,7 +178,7 @@ export class BrowserHost implements Host {
             case "n": done = orders.skip(m, reply); break;
             case "b": done = orders.moveLater(m, reply); break;
             case "escape": mode = ""; break;
-            default: mode = c.key;
+            default: if (c.key in MODE_HINTS) mode = c.key;
           }
         } else if (c.kind === "click") {
           if (mode === "w") orders.wake(m, c.x, c.y);
@@ -209,46 +198,76 @@ export class BrowserHost implements Host {
           await this.openCity(m, player, c.x, c.y);
         }
         if (done) break;
-        show();
+        status();
+        this.view.draw(m);
       }
     } finally {
+      clearInterval(timer);
       this.input.enabled = false;
+      this.current = null;
       this.view.focus = 0;
-      this.ui.showPiece(null);
-      this.ui.setHint("");
+      this.view.flashOff = false;
+      this.ui.setTurn(true, null);
+      this.view.draw(m);
     }
+  }
+
+  /** The production dialog for the city at (x, y); `captured`: a new city, set to Armies first. */
+  async production(m: Mem, x: number, y: number, player: number, captured: boolean): Promise<number> {
+    this.view.reveal(x, y, this.ui.viewport);
+    const dlg = orders.openProduction(m, x, y, player, captured);
+    const c = cityRec(dlg.city);
+    const coastal = terrainNear(m, x, y, 1 << WATER);
+    const choices: ProductionChoice[] = [0, 1, 2, 3, 5, 4, 6, 7].map((type) => ({
+      type, days: productionDays(m, type), allowed: coastal || !SHIPS.includes(type),
+    }));
+    const dest = (dx: number, dy: number) => (dx === x && dy === y ? "None" : `${dy},${dx}`);
+    this.view.draw(m);
+    const type = await this.ui.production(m.sw(DAY), dest(m.sb(c + 1), m.sb(c)), dest(m.sb(c + 3), m.sb(c + 2)),
+      m.sb(c + 8), choices, this.cellPicture(x, y));
+    orders.chooseProduction(m, dlg, type);
+    this.redraw(m);
+    return type;
+  }
+
+  /** A copy of square (x, y) as the map shows it, enlarged, for the production dialog. */
+  private cellPicture(x: number, y: number): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = CW * 3;
+    c.height = CH * 3;
+    c.getContext("2d")?.drawImage(this.view.canvas, (x - 2) * CW, (y - 2) * CH, CW * 3, CH * 3, 0, 0, CW * 3, CH * 3);
+    return c;
   }
 
   /** A double-click on one of the player's cities opens its production dialog. */
   private async openCity(m: Mem, player: number, x: number, y: number): Promise<void> {
-    const city = cityAt(m, x, y);
-    if (city === 0 || m.sb(cityRec(city) + 4) !== player) return;
+    if (!this.ownCityAt(m, player, x, y)) return;
     this.input.enabled = false;
-    const dlg = orders.openProduction(m, x, y, player, false);
-    await this.chooseProduction(m, player, x, y, dlg);
+    await this.production(m, x, y, player, false);
     this.input.enabled = true;
+  }
+
+  private ownCityAt(m: Mem, player: number, x: number, y: number): boolean {
+    const n = m.sb(-0x1e4f);
+    for (let i = 1; i <= n; i++) {
+      const c = cityRec(i);
+      if (m.sb(c + 7) === x && m.sb(c + 6) === y) return m.sb(c + 4) === player;
+    }
+    return false;
+  }
+
+  /** Whether the player is being asked to move a piece (menu commands that change orders work then). */
+  get waiting(): boolean {
+    return this.current !== null;
   }
 
   message(m: Mem, msg: Message): void {
     if (!msg.all && msg.player !== m.sb(LOCAL_PLAYER)) return;
-    this.ui.setLine(msg.line, messageText(msg));
+    this.ui.setLine(msg.line, this.words.message(msg));
   }
 
   beep(_m: Mem, _player: number): void {
-    try {
-      this.beeper ??= new AudioContext();
-      const ctx = this.beeper;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = 660;
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.12);
-    } catch {
-      // Sound is optional.
-    }
+    this.sound.beep();
   }
 
   report(_m: Mem, _entry: Record<string, number>): void {}
@@ -268,15 +287,5 @@ export class BrowserHost implements Host {
   }
 }
 
-/** The piece's standing orders, in words. */
-function describeOrders(m: Mem, p: number): string {
-  switch (pState(m, p)) {
-    case 0:
-      if (pBit5(m, p)) return "Random moves";
-      if (pPatrol(m, p)) return `Patrol to ${m.sb(p + 3)}, ${m.sb(p + 2)}`;
-      return `Go to ${m.sb(p + 3)}, ${m.sb(p + 2)}`;
-    case 2: return "Asleep";
-    case 3: return "Loading";
-    default: return "";
-  }
-}
+/** The message (STR number) shown while a command waits for a click or a drag. */
+const MODE_HINTS: Record<string, number> = { w: 1014, l: 1047, p: 1049, m: 1048, a: 1063, c: 1046 };
