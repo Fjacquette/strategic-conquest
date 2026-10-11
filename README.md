@@ -43,6 +43,7 @@ emulator on thousands of random cases (differential tests in `tools/emu/`).
 | `tools/analysis/` | Resource-fork, disassembly, cross-reference and comparison scripts |
 | `tools/save/sc3save.py` | Save-file reader: text dump and map rendering |
 | `engine/` | The game engine in TypeScript: state layout, map generation and a new game, the day loop, movement, players' orders, combat, units, path finding (`engine/src`); bridge used by the tests (`engine/test`) |
+| `web/` | The browser game: a hot-seat prototype (two players on one device) driving the engine; `npm run build` writes one self-contained page to `web/dist/play.html` |
 | `tools/emu/` | Harness that runs the original routines on an emulated 68040, and differential tests of the engine against them |
 | `tools/extract.sh` | Unpacks the game archive into `build/sc301.rsrc` |
 | `emulator/` | Headless Basilisk II setup and control scripts |
@@ -64,6 +65,7 @@ Place these in `originals/` before running the tools or emulator:
 ```bash
 pip install --break-system-packages -r tools/requirements.txt
 (cd engine && npm install && npm run check)        # Node 22+; type-checks the engine
+(cd web && npm install && npm run check && npm run build)   # the browser game: open web/dist/play.html
 tools/extract.sh                                   # writes build/sc301.rsrc
 python3 -I tools/emu/test_day.py 100              # whole days: original code vs the engine
 python3 -I tools/emu/test_turn.py 500             # whole turns

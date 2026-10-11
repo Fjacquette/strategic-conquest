@@ -1,0 +1,217 @@
+<title>Strategic Conquest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=Saira+Stencil+One&display=swap">
+<style>
+/* Layout: a chart table at night. The map fills the room; a narrow instrument panel on the right. */
+:root {
+  color-scheme: dark;
+  --bg: #11181d;
+  --panel: #182229;
+  --raised: #1f2c35;
+  --line: #2d3d48;
+  --fg: #dde4df;
+  --muted: #8d9c9b;
+  --p1: #d9614f;
+  --p2: #e2b54c;
+  --focus: #f4f1e6;
+  --error: #ef8a7a;
+  --map-fog: #1b2329;
+  --map-sea: #2a4b6b;
+  --map-land: #6e8650;
+  --map-edge: #0c1115;
+  --map-grid: rgba(244, 241, 230, 0.07);
+  --map-ink: #0e1418;
+  --city-neutral: #c9cfc9;
+  --font-display: "Saira Stencil One", "Arial Narrow", Impact, sans-serif;
+  --font-body: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.45 var(--font-body);
+}
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding-inline: 16px;
+  padding-block: 0 16px;
+  gap: 12px;
+  box-sizing: border-box;
+}
+.bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 12px 0;
+  flex-wrap: wrap;
+}
+.bar h1 {
+  margin: 0;
+  font: 400 26px/1 var(--font-display);
+  letter-spacing: 0.04em;
+  color: var(--focus);
+}
+#status { display: flex; gap: 14px; font: 600 14px/1 var(--font-data); font-variant-numeric: tabular-nums; }
+#status .day { color: var(--muted); }
+.p1 { color: var(--p1); }
+.p2 { color: var(--p2); }
+.board {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+}
+.map-wrap {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--map-fog);
+}
+#map { display: block; cursor: crosshair; touch-action: none; }
+.side {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.side section { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; }
+.side h3 {
+  margin: 0 0 8px;
+  font: 600 11px/1 var(--font-data);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+#piece h2 { margin: 0 0 8px; font: 600 20px/1.1 var(--font-body); }
+#piece dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; }
+#piece dt { color: var(--muted); }
+#piece dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.quiet { color: var(--muted); margin: 0; }
+.messages p { margin: 0; min-height: 1.45em; font-family: var(--font-data); font-size: 13px; }
+#hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+.commands { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.commands button { text-align: left; }
+.commands kbd {
+  float: right;
+  font: 600 12px/1.6 var(--font-data);
+  color: var(--muted);
+}
+button {
+  font: 500 14px/1 var(--font-body);
+  color: var(--fg);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button.primary { background: var(--focus); color: var(--map-ink); border-color: var(--focus); font-weight: 600; }
+.keys { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+.keys li + li { margin-top: 4px; }
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(10, 14, 17, 0.72);
+}
+.card {
+  width: min(440px, 100%);
+  box-sizing: border-box;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card h2 { margin: 0; font: 400 24px/1.1 var(--font-display); letter-spacing: 0.03em; text-wrap: balance; }
+.card p { margin: 0; }
+.card label { color: var(--muted); }
+.card input[type="password"] {
+  font: 600 18px/1 var(--font-data);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 8px 10px;
+}
+.card form { display: flex; flex-direction: column; gap: 10px; }
+.field { display: grid; grid-template-columns: auto 1fr 2ch; gap: 12px; align-items: center; }
+.field output { font: 600 16px/1 var(--font-data); text-align: right; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.error { color: var(--error); min-height: 1.45em; }
+.types { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.type { display: flex; align-items: center; gap: 8px; background: var(--raised); border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; }
+.type label { display: flex; justify-content: space-between; gap: 8px; flex: 1; color: var(--fg); }
+.type .days { font: 12px/1.4 var(--font-data); color: var(--muted); }
+.type input:disabled + label { opacity: 0.45; }
+@media (max-width: 760px) {
+  .board { grid-template-columns: minmax(0, 1fr); grid-template-rows: 60vh auto; }
+  .app { height: auto; min-height: 100%; }
+}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <h1>Strategic Conquest</h1>
+    <span id="status"></span>
+  </header>
+  <main class="board">
+    <div class="map-wrap" id="map-wrap"><canvas id="map" aria-label="Map"></canvas></div>
+    <aside class="side">
+      <section aria-labelledby="piece-h">
+        <h3 id="piece-h">Piece</h3>
+        <div id="piece"><p class="quiet">Waiting for the next piece.</p></div>
+        <p id="hint"></p>
+      </section>
+      <section aria-labelledby="orders-h">
+        <h3 id="orders-h">Orders</h3>
+        <div class="commands" id="commands">
+          <button type="button" data-key="s">Sleep <kbd>S</kbd></button>
+          <button type="button" data-key="n">Skip <kbd>N</kbd></button>
+          <button type="button" data-key="b">Move later <kbd>B</kbd></button>
+          <button type="button" data-key="r">Random <kbd>R</kbd></button>
+          <button type="button" data-key="w">Wake <kbd>W</kbd></button>
+          <button type="button" data-key="l">Load <kbd>L</kbd></button>
+          <button type="button" data-key="p">Patrol <kbd>P</kbd></button>
+          <button type="button" data-key="m">Stack move <kbd>M</kbd></button>
+          <button type="button" data-key="a">Army dest. <kbd>A</kbd></button>
+          <button type="button" data-key="c">Air dest. <kbd>C</kbd></button>
+        </div>
+      </section>
+      <section class="messages" aria-labelledby="messages-h" aria-live="polite">
+        <h3 id="messages-h">Messages</h3>
+        <p id="line1"></p>
+        <p id="line2"></p>
+      </section>
+      <section aria-labelledby="keys-h">
+        <h3 id="keys-h">Moving</h3>
+        <ul class="keys">
+          <li>Keypad 1–9 or arrow keys: one square. Keypad 5: stay.</li>
+          <li>Click a square next to the piece to move there.</li>
+          <li>Drag from a piece to any square: go there.</li>
+          <li>Double-click your city: change what it builds.</li>
+        </ul>
+      </section>
+    </aside>
+  </main>
+</div>
+<div class="overlay" id="overlay" hidden><div class="card" id="card" role="dialog" aria-modal="true"></div></div>
+<!-- APP -->

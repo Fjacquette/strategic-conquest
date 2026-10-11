@@ -1,0 +1,13 @@
+{
+  "name": "strategic-conquest-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc -p tsconfig.json",
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2",
+    "typescript": "5.8.3"
+  }
+}
