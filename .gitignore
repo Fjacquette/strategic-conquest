@@ -9,3 +9,4 @@ __pycache__/
 *.rsrc
 node_modules/
 web/dist/
+web/assets/
