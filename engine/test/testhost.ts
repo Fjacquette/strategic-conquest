@@ -58,7 +58,7 @@ export class TestHost implements Host {
   snapAt = -1;
   private count = 0;
 
-  request(m: Mem, req: Request, reply: Reply): void {
+  async request(m: Mem, req: Request, reply: Reply): Promise<void> {
     if (this.count++ === this.snapAt) this.log.push(["snap", Buffer.from(m.u8).toString("base64")]);
     this.log.push(["req", Array.from(req.rec), this.digest(m)]);
     if (req.code === RequestCode.PASSWORD && req.rec[8] === 1) req.rec.set(testPassword(req.player), 2);

@@ -1,6 +1,7 @@
 /**
  * Engine routines callable from the differential tests, by name. Arguments arrive as a
- * JSON array; `log` collects host events (requests, messages) for comparison.
+ * JSON array; `log` collects host events (requests, messages) for comparison. A routine
+ * may return a promise, which the bridge awaits.
  */
 import { Mem } from "../src/mem.ts";
 import { hashFind, hashInsert, hashRemove, topPieceAt } from "../src/hash.ts";
@@ -15,11 +16,14 @@ import { gameRandom, qdRandom } from "../src/random.ts";
 import { attack, bomberBlast } from "../src/battle.ts";
 import { playerTurn } from "../src/turn.ts";
 import { buildPiece, movesPerDay, productionDays } from "../src/units.ts";
-import { DayLoop, defeated, endChecks, handOffNeeded, runDay, spottedDecay, swapSides } from "../src/day.ts";
+import {
+  DayLoop, defeated, endChecks, handOffNeeded, runDay, setUpControllers, spottedDecay, swapSides,
+} from "../src/day.ts";
 import * as orders from "../src/orders.ts";
 import { coastalCity, generateMap, inlandCity, islandOutline, placeCity, scatterCities } from "../src/mapgen.ts";
 import { putLine, Region } from "../src/quickdraw.ts";
 import { clearPlayerMaps, clearTables, newGame, startingCities } from "../src/newgame.ts";
+import { initGlobals } from "../src/launch.ts";
 import { Reply, Request } from "../src/host.ts";
 import { TestHost, type Action } from "./testhost.ts";
 
@@ -56,10 +60,10 @@ export const registry: Record<string, Fn> = {
   movesPerDay: (m, [ptype, strength]) => movesPerDay(m, ptype, strength),
   productionDays: (m, [ptype]) => productionDays(m, ptype),
   buildPiece: (m, [x, y, owner, ptype]) => buildPiece(m, x, y, owner, ptype),
-  playerTurn: (m, [player, actions, ignore, snapAt], log) => {
+  playerTurn: async (m, [player, actions, ignore, snapAt], log) => {
     const host = new TestHost(actions as Action[], log, ignore ?? []);
     host.snapAt = snapAt ?? -1;
-    playerTurn(m, host, player);
+    await playerTurn(m, host, player);
   },
   gameRandom: (m) => gameRandom(m),
   handOffNeeded: (m, [player]) => handOffNeeded(m, player),
@@ -117,26 +121,28 @@ export const registry: Record<string, Fn> = {
     const b = r.bbox();
     return [r.points, [b.top, b.left, b.bottom, b.right]];
   },
+  initGlobals: (m) => initGlobals(m),
+  setUpControllers: (m) => setUpControllers(m),
   clearTables: (m) => clearTables(m),
   clearPlayerMaps: (m) => clearPlayerMaps(m),
-  startingCities: (m, [player, cityA, cityB, production, ignore], log) => {
+  startingCities: async (m, [player, cityA, cityB, production, ignore], log) => {
     const host = new TestHost([], log, ignore ?? []);
     host.production = production;
-    startingCities(m, host, player, cityA, cityB);
+    await startingCities(m, host, player, cityA, cityB);
   },
-  newGame: (m, [clock, production, ignore], log) => {
+  newGame: async (m, [clock, production, ignore], log) => {
     const host = new TestHost([], log, ignore ?? []);
     host.clock = clock;
     host.production = production;
-    newGame(m, host);
+    await newGame(m, host);
   },
-  runDay: (m, [actions, clock, decided, firstHandoff], log) => {
+  runDay: async (m, [actions, clock, decided, firstHandoff], log) => {
     const host = new TestHost(actions as Action[], log);
     host.clock = clock;
     const loop = new DayLoop();
     loop.decided = !!decided;
     loop.firstHandoff = !!firstHandoff;
-    const end = runDay(m, host, loop);
+    const end = await runDay(m, host, loop);
     return [end.p1Defeated, end.p2Surrenders, loop.decided, loop.firstHandoff];
   },
 };

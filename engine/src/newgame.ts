@@ -75,7 +75,7 @@ function lookout(scratch: Uint8Array, x: number, y: number): Uint8Array {
  * choose their city's production. The computer's city builds Fighters, and so does
  * player 1's under Auto Play.
  */
-export function startingCities(m: Mem, host: Host, player: number, cityA: number, cityB: number): void {
+export async function startingCities(m: Mem, host: Host, player: number, cityA: number, cityB: number): Promise<void> {
   const req = new Request();
   const reply = new Reply();
   const scratch = new Uint8Array(14);
@@ -91,17 +91,17 @@ export function startingCities(m: Mem, host: Host, player: number, cityA: number
   if (m.b(AUTO_PLAY)) {
     setCityOwner(m, FIGHTER, cityAt(m, x, y), 1);
   } else {
-    if (inSet(PASSWORD_MODES, mode)) setPassword(m, host, req, reply, 1);
+    if (inSet(PASSWORD_MODES, mode)) await setPassword(m, host, req, reply, 1);
     req.rec[5] = x;
     req.rec[4] = y;
     req.player = player;
     req.code = RequestCode.TURN_START;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     req.code = RequestCode.PRODUCTION;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
   }
   req.code = RequestCode.SHOW_POSITION;
-  host.request(m, req, reply);
+  await host.request(m, req, reply);
 
   c = cityRec(cityB);
   x = m.sb(c + 7);
@@ -111,28 +111,28 @@ export function startingCities(m: Mem, host: Host, player: number, cityA: number
   req.rec[4] = y;
   req.player = opp;
   const city = cityAt(m, x, y);
-  if (inSet(PASSWORD_MODES, mode)) setPassword(m, host, req, reply, 2);
+  if (inSet(PASSWORD_MODES, mode)) await setPassword(m, host, req, reply, 2);
   if (mode === 1 || mode === 2) {
     req.rec[5] = x;
     req.rec[4] = y;
     req.player = opp;
     req.code = RequestCode.PRODUCTION;
     req.ptype = 0;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     setCityOwner(m, req.ptype, city, mode === 2 ? 2 : opp);
   } else {
     setCityOwner(m, FIGHTER, city, 2);
   }
   req.code = RequestCode.SHOW_POSITION;
-  host.request(m, req, reply);
+  await host.request(m, req, reply);
   messageA(m, host, CLEAR_LINE, 1, player, 1, 0);
 }
 
 /** The request's player sets a password, kept as password `slot`. */
-function setPassword(m: Mem, host: Host, req: Request, reply: Reply, slot: number): void {
+async function setPassword(m: Mem, host: Host, req: Request, reply: Reply, slot: number): Promise<void> {
   req.code = RequestCode.PASSWORD;
   req.rec[8] = 1;
-  host.request(m, req, reply);
+  await host.request(m, req, reply);
   m.bytes(PASSWORDS[slot], 6).set(req.rec.subarray(2, 8));
 }
 
@@ -141,7 +141,7 @@ function setPassword(m: Mem, host: Host, req: Request, reply: Reply, slot: numbe
  * with the first city of home island 1 and player 2 with the first of home island 2. The
  * caller (CODE 2 + 0x2C20) then marks the game as not yet saved (AUTOSAVE_OFF).
  */
-export function newGame(m: Mem, host: Host): void {
+export async function newGame(m: Mem, host: Host): Promise<void> {
   m.setB(AUTOSAVE_OFF, 0);
   clearTables(m);
   m.setL(GAME_SEED, host.dateTime(m));
@@ -149,7 +149,7 @@ export function newGame(m: Mem, host: Host): void {
   clearPlayerMaps(m);
   m.setW(DAY, 0);
   const home = HOME_ISLAND[1];
-  startingCities(m, host, 1, 1, s8(m.sw(home + 6) + m.sw(home + 8) + 1));
+  await startingCities(m, host, 1, 1, s8(m.sw(home + 6) + m.sw(home + 8) + 1));
   if (m.sb(GAME_MODE) === 0) {
     host.aiNewGame(m);
     host.aiNewSide(m);
@@ -160,7 +160,7 @@ export function newGame(m: Mem, host: Host): void {
   const req = new Request();
   req.code = RequestCode.HANDOFF_SCREEN;
   req.player = 1;
-  host.request(m, req, new Reply());
+  await host.request(m, req, new Reply());
   m.setW(AI_LIMIT_10, 10);
   m.setW(AI_LIMIT_8, 8);
 }

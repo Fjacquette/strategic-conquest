@@ -121,7 +121,7 @@ function lostMessage(m: Mem, host: Host, ptype: number, player: number): void {
 }
 
 /** CODE 5 + 0x2428 */
-export function moveArmy(m: Mem, host: Host, p: number, player: number, idx: number): void {
+export async function moveArmy(m: Mem, host: Host, p: number, player: number, idx: number): Promise<void> {
   const req = new Request();
   const reply = new Reply();
   const startPos = m.w(p + 6);
@@ -153,13 +153,13 @@ export function moveArmy(m: Mem, host: Host, p: number, player: number, idx: num
   req.w6 = m.w(MOVES_LEFT);
   const d: Dir = { dx: 0, dy: 0 };
   const interrupt = orderStep(m, host, p, player, idx, d, ARMY_FORBIDDEN);
-  const r = stepExecutor(m, host, p, player, idx, d, ARMY_FORBIDDEN, interrupt, reply);
+  const r = await stepExecutor(m, host, p, player, idx, d, ARMY_FORBIDDEN, interrupt, reply);
   if (r.lost) {
     killPiece(m, idx);
     req.code = RequestCode.STEP_DONE_NOTEWORTHY;
     req.player = player;
     req.pos = m.w(p + 6);
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
   }
   const x = pX(m, p), y = pY(m, p);
   const t = terrainAt(m, x, y);
@@ -178,7 +178,7 @@ export function moveArmy(m: Mem, host: Host, p: number, player: number, idx: num
     req.index = idx;
     const save = m.w(p + 6);
     m.setW(p + 6, startPos);
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     m.setW(p + 6, save);
   }
   if (dayRandomCheck(m)) {
@@ -206,7 +206,7 @@ export function moveArmy(m: Mem, host: Host, p: number, player: number, idx: num
     req.player = local;
     req.code = RequestCode.PIECE_BUILT;
     req.pos = m.w(p + 6);
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     if (oldOwner !== 0) {
       const id = player === local ? 0x03f8 : 0x040c;
       messageA(m, host, 0xffff0000 | id, 2, player, 1, 1);
@@ -217,7 +217,7 @@ export function moveArmy(m: Mem, host: Host, p: number, player: number, idx: num
     req.code = RequestCode.PRODUCTION;
     req.ptype = 0;
     req.pos = m.w(p + 6);
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     // The original passes an uninitialised local record here (quirk Q9); a zeroed one stands in.
     explore(m, new Uint8Array(14), x, y, player);
   } else {
@@ -238,14 +238,14 @@ export function moveArmy(m: Mem, host: Host, p: number, player: number, idx: num
   req.player = player;
   req.code = RequestCode.MOVED;
   req.pos = startPos;
-  host.request(m, req, reply);
+  await host.request(m, req, reply);
   req.code = RequestCode.PIECE_BUILT;
   req.pos = m.w(p + 6);
-  host.request(m, req, reply);
+  await host.request(m, req, reply);
 }
 
 /** CODE 5 + 0x3814 (Destroyer), 0x3962 (Submarine), 0x3F58 (Battleship). */
-export function moveShip(m: Mem, host: Host, p: number, player: number, idx: number): void {
+export async function moveShip(m: Mem, host: Host, p: number, player: number, idx: number): Promise<void> {
   if (pState(m, p) === 2) return;
   const ptype = pType(m, p);
   const req = new Request();
@@ -258,13 +258,13 @@ export function moveShip(m: Mem, host: Host, p: number, player: number, idx: num
   const set = (1 << enemyCity(m, player)) | SHIP_FORBIDDEN;
   const d: Dir = { dx: 0, dy: 0 };
   const interrupt = orderStep(m, host, p, player, idx, d, set);
-  const r = stepExecutor(m, host, p, player, idx, d, set, interrupt, reply);
+  const r = await stepExecutor(m, host, p, player, idx, d, set, interrupt, reply);
   if (r.lost) {
     killPiece(m, idx);
     req.code = RequestCode.STEP_DONE_NOTEWORTHY;
     req.pos = m.w(p + 6);
     req.player = player;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     lostMessage(m, host, ptype, player);
   }
 }
@@ -274,7 +274,7 @@ export function moveShip(m: Mem, host: Host, p: number, player: number, idx: num
  * single-player games, player 2's Transport arriving at its destination with Armies aboard
  * wakes them (and itself).
  */
-export function moveTransport(m: Mem, host: Host, p: number, player: number, idx: number): void {
+export async function moveTransport(m: Mem, host: Host, p: number, player: number, idx: number): Promise<void> {
   if (pState(m, p) !== 2 && pState(m, p) !== 3) {
     const req = new Request();
     const reply = new Reply();
@@ -286,7 +286,7 @@ export function moveTransport(m: Mem, host: Host, p: number, player: number, idx
     const set = ((1 << enemyCity(m, player)) | SHIP_FORBIDDEN) & 0xff;
     const d: Dir = { dx: 0, dy: 0 };
     const interrupt = orderStep(m, host, p, player, idx, d, set);
-    const r = stepExecutor(m, host, p, player, idx, d, set, interrupt, reply);
+    const r = await stepExecutor(m, host, p, player, idx, d, set, interrupt, reply);
     if (terrainNear(m, pX(m, p), pY(m, p), (1 << enemyCity(m, player)) | 0x0002)) wakeAllAt(m, pX(m, p), pY(m, p));
     if (r.lost) {
       killPiece(m, idx);
@@ -295,7 +295,7 @@ export function moveTransport(m: Mem, host: Host, p: number, player: number, idx
       req.code = RequestCode.STEP_DONE_NOTEWORTHY;
       req.pos = m.w(p + 6);
       req.player = player;
-      host.request(m, req, reply);
+      await host.request(m, req, reply);
       lostMessage(m, host, TRANSPORT, player);
       return;
     }
@@ -308,7 +308,7 @@ export function moveTransport(m: Mem, host: Host, p: number, player: number, idx
 }
 
 /** CODE 5 + 0x3D4E */
-export function moveCarrier(m: Mem, host: Host, p: number, player: number, idx: number): void {
+export async function moveCarrier(m: Mem, host: Host, p: number, player: number, idx: number): Promise<void> {
   if (pState(m, p) === 2) return;
   const req = new Request();
   const reply = new Reply();
@@ -326,7 +326,7 @@ export function moveCarrier(m: Mem, host: Host, p: number, player: number, idx: 
   const set = (1 << enemyCity(m, player)) | SHIP_FORBIDDEN;
   const d: Dir = { dx: 0, dy: 0 };
   const interrupt = orderStep(m, host, p, player, idx, d, set);
-  const r = stepExecutor(m, host, p, player, idx, d, set, interrupt, reply);
+  const r = await stepExecutor(m, host, p, player, idx, d, set, interrupt, reply);
   if (r.lost) {
     killPiece(m, idx);
     killTypesAt(m, pX(m, p), pY(m, p), 1 << CARRIER);
@@ -334,13 +334,15 @@ export function moveCarrier(m: Mem, host: Host, p: number, player: number, idx: 
     req.code = RequestCode.STEP_DONE_NOTEWORTHY;
     req.pos = m.w(p + 6);
     req.player = player;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     lostMessage(m, host, CARRIER, player);
   }
 }
 
 /** CODE 5 + 0x340A / 0x2DD6: an aircraft out of fuel crashes. */
-function outOfFuel(m: Mem, host: Host, p: number, player: number, idx: number, req: Request, reply: Reply, msg: number, all: number): boolean {
+async function outOfFuel(
+  m: Mem, host: Host, p: number, player: number, idx: number, req: Request, reply: Reply, msg: number, all: number,
+): Promise<boolean> {
   if (pCargo(m, p) > 0) return false;
   messageA(m, host, msg, 2, player, 0, all);
   killPiece(m, idx);
@@ -348,18 +350,18 @@ function outOfFuel(m: Mem, host: Host, p: number, player: number, idx: number, r
   req.code = RequestCode.MOVED;
   req.pos = m.w(p + 6);
   req.index = idx;
-  host.request(m, req, reply);
+  await host.request(m, req, reply);
   return true;
 }
 
 /** CODE 5 + 0x349E. Returns whether the Fighter ended the step refuelled. */
-export function moveFighter(m: Mem, host: Host, p: number, player: number, idx: number): boolean {
+export async function moveFighter(m: Mem, host: Host, p: number, player: number, idx: number): Promise<boolean> {
   const req = new Request();
   const reply = new Reply();
   if (pState(m, p) === 2) {
     if (terrainAt(m, pX(m, p), pY(m, p)) !== ownCity(m, player) &&
         !topIs(m, pX(m, p), pY(m, p), 1 << CARRIER, 1 << player)) {
-      if (!outOfFuel(m, host, p, player, idx, req, reply, 0xffff03f7, isComputer(m, player) ? 0 : 1)) {
+      if (!(await outOfFuel(m, host, p, player, idx, req, reply, 0xffff03f7, isComputer(m, player) ? 0 : 1))) {
         setCargo(m, p, pCargo(m, p) - 1);
       }
     }
@@ -370,12 +372,12 @@ export function moveFighter(m: Mem, host: Host, p: number, player: number, idx: 
   req.player = player;
   req.index = idx;
   req.w6 = m.w(MOVES_LEFT);
-  if (outOfFuel(m, host, p, player, idx, req, reply, 0xffff03f7, isComputer(m, player) ? 0 : 1)) return false;
+  if (await outOfFuel(m, host, p, player, idx, req, reply, 0xffff03f7, isComputer(m, player) ? 0 : 1)) return false;
   let refuelled = false;
   const startPos = m.w(p + 6);
   const d: Dir = { dx: 0, dy: 0 };
   const interrupt = orderStep(m, host, p, player, idx, d, NO_TERRAIN);
-  const r = stepExecutor(m, host, p, player, idx, d, NO_TERRAIN, interrupt, reply);
+  const r = await stepExecutor(m, host, p, player, idx, d, NO_TERRAIN, interrupt, reply);
   if (pCargo(m, p) > 0) setCargo(m, p, pCargo(m, p) - 1);
   if (m.b(STEP_FLAG_1A95)) setCargo(m, p, 20);
   if (pCargo(m, p) === 10 && pState(m, p) === 0 && isComputer(m, player) &&
@@ -394,22 +396,22 @@ export function moveFighter(m: Mem, host: Host, p: number, player: number, idx: 
     req.player = player;
     req.code = RequestCode.STEP_DONE_NOTEWORTHY;
     req.pos = startPos;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
   }
   return refuelled;
 }
 
 /** CODE 5 + 0x2E50. Returns whether the Bomber ended the step in one of its cities. */
-export function moveBomber(m: Mem, host: Host, p: number, player: number, idx: number): boolean {
+export async function moveBomber(m: Mem, host: Host, p: number, player: number, idx: number): Promise<boolean> {
   const req = new Request();
   const reply = new Reply();
   if (pState(m, p) === 2) {
     if (terrainAt(m, pX(m, p), pY(m, p)) !== ownCity(m, player)) {
-      if (!outOfFuel(m, host, p, player, idx, req, reply, 0xffff0412, 1)) setCargo(m, p, pCargo(m, p) - 1);
+      if (!(await outOfFuel(m, host, p, player, idx, req, reply, 0xffff0412, 1))) setCargo(m, p, pCargo(m, p) - 1);
     }
     return false;
   }
-  if (outOfFuel(m, host, p, player, idx, req, reply, 0xffff0412, 1)) return false;
+  if (await outOfFuel(m, host, p, player, idx, req, reply, 0xffff0412, 1)) return false;
   req.code = RequestCode.DIRECTION;
   req.pos = m.w(p + 6);
   req.player = player;
@@ -418,7 +420,7 @@ export function moveBomber(m: Mem, host: Host, p: number, player: number, idx: n
   const startPos = m.w(p + 6);
   const d: Dir = { dx: 0, dy: 0 };
   const interrupt = orderStep(m, host, p, player, idx, d, NO_TERRAIN);
-  const r = stepExecutor(m, host, p, player, idx, d, NO_TERRAIN, interrupt, reply);
+  const r = await stepExecutor(m, host, p, player, idx, d, NO_TERRAIN, interrupt, reply);
   if (pCargo(m, p) > 0) setCargo(m, p, pCargo(m, p) - 1);
   if (pCargo(m, p) === 15 && pState(m, p) === 0 && isComputer(m, player) &&
       terrainAt(m, m.sb(p + 3), m.sb(p + 2)) !== ownCity(m, player)) setState(m, p, 1);
@@ -432,19 +434,19 @@ export function moveBomber(m: Mem, host: Host, p: number, player: number, idx: n
     host.report(m, { kind: 3, radius: pRadius(m, p), pos: req.pos });
     req.index = idx;
     req.code = RequestCode.SHOW_POSITION;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     if (player !== m.sb(LOCAL_PLAYER)) host.event(m, "sound", { id: 2 });
     req.flag = 0;
     req.code = RequestCode.STEP_DONE_NOTEWORTHY;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     req.player = player;
     bomberBlast(m, p, idx, seen2 ? 1 : 0);
     req.code = RequestCode.BOMBER_BLAST_DONE;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     killPiece(m, idx);
     req.code = RequestCode.STEP_DONE_NOTEWORTHY;
     req.pos = startPos;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     if (isComputer(m, req.player)) {
       const n = pieceCount(m);
       for (let i = 1; i <= n; i++) {
@@ -465,7 +467,7 @@ export function moveBomber(m: Mem, host: Host, p: number, player: number, idx: n
     req.player = player;
     req.code = RequestCode.STEP_DONE_NOTEWORTHY;
     req.pos = startPos;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     return false;
   }
   return terrainAt(m, x, y) === ownCity(m, player);
@@ -478,7 +480,7 @@ export function moveBomber(m: Mem, host: Host, p: number, player: number, idx: n
  * after last turn's), in piece-table order within a region. Pieces whose step the
  * controller deferred are revisited in further sweeps. The table is compacted at the end.
  */
-export function playerTurn(m: Mem, host: Host, player: number): void {
+export async function playerTurn(m: Mem, host: Host, player: number): Promise<void> {
   const req = new Request();
   const reply = new Reply();
   let anyBuilt = false;
@@ -502,7 +504,7 @@ export function playerTurn(m: Mem, host: Host, player: number): void {
       req.pos = m.w(cr + 6);
       req.player = player;
       req.code = RequestCode.PIECE_BUILT;
-      host.request(m, req, reply);
+      await host.request(m, req, reply);
     }
     anyBuilt = anyBuilt || built;
   }
@@ -510,9 +512,9 @@ export function playerTurn(m: Mem, host: Host, player: number): void {
   if (isComputer(m, player)) host.aiPlan(m);
   req.player = player;
   req.code = RequestCode.TURN_START;
-  host.request(m, req, reply);
+  await host.request(m, req, reply);
   req.code = RequestCode.BEFORE_STEP;
-  host.request(m, req, reply);
+  await host.request(m, req, reply);
   do {
     const start = m.sb(REGION_START);
     m.setB(ANY_DEFERRED, 0);
@@ -536,7 +538,7 @@ export function playerTurn(m: Mem, host: Host, player: number): void {
           m.setW(MOVES_LEFT, movesPerDay(m, pType(m, p), pStrength(m, p), i) - m.sw(MOVE_STEP) + 1);
           req.code = RequestCode.BEFORE_STEP;
           req.player = player;
-          host.request(m, req, reply);
+          await host.request(m, req, reply);
           m.setB(STEP_FLAG_1A95, 0);
           const x = pX(m, p), y = pY(m, p);
           if (pType(m, p) === DESTROYER) {
@@ -558,39 +560,39 @@ export function playerTurn(m: Mem, host: Host, player: number): void {
           }
           switch (pType(m, p)) {
             case ARMY:
-              moveArmy(m, host, p, player, i);
+              await moveArmy(m, host, p, player, i);
               break;
             case FIGHTER: {
               m.setB(STEP_FLAG_1A95, 0);
               const fuel = pCargo(m, p);
-              moveFighter(m, host, p, player, i);
+              await moveFighter(m, host, p, player, i);
               if (m.b(PIECE_DEFERRED)) setCargo(m, p, fuel);
               if (pState(m, p) === 2) m.setW(MOVE_STEP, movesPerDay(m, pType(m, p), pStrength(m, p), i));
               break;
             }
             case DESTROYER:
               if (m.sw(MOVE_STEP) === 1) repairInPort(m, 4, player, p);
-              moveShip(m, host, p, player, i);
+              await moveShip(m, host, p, player, i);
               break;
             case SUBMARINE:
               if (m.sw(MOVE_STEP) === 1) repairInPort(m, 3, player, p);
-              moveShip(m, host, p, player, i);
+              await moveShip(m, host, p, player, i);
               break;
             case TRANSPORT:
               if (m.sw(MOVE_STEP) === 1) repairInPort(m, 3, player, p);
-              moveTransport(m, host, p, player, i);
+              await moveTransport(m, host, p, player, i);
               break;
             case CARRIER:
               if (m.sw(MOVE_STEP) === 1) repairInPort(m, 10, player, p);
-              moveCarrier(m, host, p, player, i);
+              await moveCarrier(m, host, p, player, i);
               break;
             case BATTLESHIP:
               if (m.sw(MOVE_STEP) === 1) repairInPort(m, 18, player, p);
-              moveShip(m, host, p, player, i);
+              await moveShip(m, host, p, player, i);
               break;
             case BOMBER: {
               const fuel = pCargo(m, p);
-              moveBomber(m, host, p, player, i);
+              await moveBomber(m, host, p, player, i);
               if (m.b(PIECE_DEFERRED)) setCargo(m, p, fuel);
               if (pState(m, p) === 2) m.setW(MOVE_STEP, movesPerDay(m, pType(m, p), pStrength(m, p), i));
               break;

@@ -133,16 +133,16 @@ export interface StepResult {
  * own piece, into water or onto land) is refused with a warning unless the same direction
  * is given twice in a row.
  */
-export function stepExecutor(
+export async function stepExecutor(
   m: Mem, host: Host, p: number, player: number, idx: number, d: Dir, terrainSet: number,
   interrupt: boolean, reply: Reply,
-): StepResult {
+): Promise<StepResult> {
   const res: StepResult = { lost: false, armyInOwnCity: false };
   const start = m.w(p + 6);
   if (pState(m, p) === 0 && !interrupt) {
     reply.dx = d.dx;
     reply.dy = d.dy;
-    executeMove(m, host, idx, player, p, reply.dx, reply.dy, start);
+    await executeMove(m, host, idx, player, p, reply.dx, reply.dy, start);
   } else {
     const req = new Request();
     req.code = RequestCode.DIRECTION;
@@ -156,7 +156,7 @@ export function stepExecutor(
     let tx: number, ty: number;
     for (;;) {
       const stateBefore = pState(m, p);
-      host.request(m, req, reply);
+      await host.request(m, req, reply);
       if (pState(m, p) === 2) return { lost: false, armyInOwnCity: false };
       if (!repeated && pState(m, p) === 0 && stateBefore !== 0) {
         const nd = nextStep(m, terrainSet & 0xff, m.bytes(p, 14));
@@ -222,7 +222,7 @@ export function stepExecutor(
       }
       if (((!res.lost && !attackOwn) || repeated) && onMap(tx, ty)) break;
     }
-    executeMove(m, host, idx, player, p, reply.dx, reply.dy, start);
+    await executeMove(m, host, idx, player, p, reply.dx, reply.dy, start);
     if (interrupt || ordered) m.setW(p + 4, m.w(p + 6));
   }
   m.setB(NET_SYNC, 0);
@@ -238,7 +238,9 @@ export function stepExecutor(
  * Bomber reaching its target, leaving and boarding Transports and Carriers, Armies
  * attacking from a ship at sea, attacks (CODE 5 + 0x0676), and the move itself with cargo.
  */
-export function executeMove(m: Mem, host: Host, idx: number, player: number, p: number, dx: number, dy: number, start: number): void {
+export async function executeMove(
+  m: Mem, host: Host, idx: number, player: number, p: number, dx: number, dy: number, start: number,
+): Promise<void> {
   const req = new Request();
   const reply = new Reply();
   const tx0 = pX(m, p) + dx, ty0 = pY(m, p) + dy;
@@ -251,7 +253,7 @@ export function executeMove(m: Mem, host: Host, idx: number, player: number, p: 
     req.code = RequestCode.MOVED;
     req.ptype = pType(m, p);
     req.pos = start;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     return;
   }
   let battle = false;
@@ -273,7 +275,7 @@ export function executeMove(m: Mem, host: Host, idx: number, player: number, p: 
     setState(m, p, 2);
   }
 
-  const fight = () => {
+  const fight = async () => {
     // CODE 5 + 0x0676 (nested in the original)
     const spottedBefore = pSpotted(m, q);
     setAttacks(m, p, pAttacks(m, p) + 1);
@@ -286,14 +288,14 @@ export function executeMove(m: Mem, host: Host, idx: number, player: number, p: 
       if (pType(m, p) === SUBMARINE) setSpotted(m, p, 1);
       if (pType(m, q) === SUBMARINE) setSpotted(m, q, 1);
       req.code = RequestCode.STEP_DONE_NOTEWORTHY;
-      host.request(m, req, reply);
+      await host.request(m, req, reply);
       req.code = RequestCode.BATTLE;
     } else {
       req.code = RequestCode.STEP_DONE_NOTEWORTHY;
-      host.request(m, req, reply);
+      await host.request(m, req, reply);
       req.code = RequestCode.CITY_REPELLED_OR_NEUTRAL;
     }
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     battle = true;
     const attTypeBefore = pType(m, p), defTypeBefore = pType(m, q);
     const attackerPos = m.w(p + 6), defenderPos = m.w(q + 6);
@@ -342,10 +344,10 @@ export function executeMove(m: Mem, host: Host, idx: number, player: number, p: 
                 distance(m.sb(r + 3) - pX(m, r), m.sb(r + 2) - pY(m, r)) <= 10) setState(m, r, 1);
           }
         }
-        fight();
+        await fight();
       }
     } else {
-      fight();
+      await fight();
     }
   }
   if (battle) {
@@ -359,14 +361,14 @@ export function executeMove(m: Mem, host: Host, idx: number, player: number, p: 
       req.ptype = pType(m, me);
       req.pos = m.w(me + 6);
       req.code = RequestCode.STEP_DONE_NOTEWORTHY;
-      host.request(m, req, reply);
+      await host.request(m, req, reply);
     } else if (pType(m, me) === REMOVED) {
       req.player = m.sb(LOCAL_PLAYER);
       req.index = target;
       req.ptype = pType(m, q);
       req.pos = m.w(q + 6);
       req.code = RequestCode.STEP_DONE_NOTEWORTHY;
-      host.request(m, req, reply);
+      await host.request(m, req, reply);
     }
   }
   if (dx !== 0 || dy !== 0) {
@@ -394,13 +396,13 @@ export function executeMove(m: Mem, host: Host, idx: number, player: number, p: 
     req.w6 = m.w(MOVE_STEP);
     req.ptype = pType(m, p);
     req.pos = start;
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
     m.setB(STEP_NOTEWORTHY, noteworthy ? 1 : 0);
     if (pType(m, p) !== REMOVED) {
       req.pos = m.w(p + 6);
       req.code = noteworthy ? RequestCode.STEP_DONE_NOTEWORTHY : RequestCode.STEP_DONE;
       req.flag = m.b(SHOW_MOVE);
-      host.request(m, req, reply);
+      await host.request(m, req, reply);
     }
     m.setB(NET_SYNC, 1);
   }

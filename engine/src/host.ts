@@ -19,6 +19,9 @@
  *
  * Fields a request does not set keep whatever the record held before; the engine keeps one
  * record per caller frame, as the original does, so they match.
+ *
+ * Requests are the engine's only waits: every function that leads to one is async, and
+ * test/promises.ts checks that each such call is awaited.
  */
 import { Mem } from "./mem.ts";
 
@@ -103,8 +106,12 @@ export function messageB(m: Mem, host: Host, msg: number, flags: number, player:
 }
 
 export interface Host {
-  /** CODE 5 + 0x5CBA: a request to the controller of `req.player`. */
-  request(m: Mem, req: Request, reply: Reply): void;
+  /**
+   * CODE 5 + 0x5CBA: a request to the controller of `req.player`. The engine waits for it:
+   * a human player's answer comes from the user interface, or from the other browser in a
+   * network game.
+   */
+  request(m: Mem, req: Request, reply: Reply): Promise<void>;
   /** A message shown to a player. */
   message(m: Mem, msg: Message): void;
   /** CODE 1 + 0x0928: the error beep for a human player's refused move. */

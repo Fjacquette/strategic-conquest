@@ -4,7 +4,9 @@ CODE 10 + 0x093C and its parts: clearing the tables (CODE 2 + 0x00EA) and the pl
 
 Usage: python3 -I tools/emu/test_newgame.py [cases] [seed] [--verbose]
 
-The parts run on random stale state; the starting cities also on random pairs of cities in
+The launch tables (CODE 2 + 0x2CE2, +0x2DEA and the combat table) are built on an empty
+globals image. The parts, and the controllers' set-up for the game mode (CODE 1 + 0x1628),
+run on random stale state; the starting cities also on random pairs of cities in
 game modes 0-3. Whole new games run in modes 0 (against the computer), 1 (two players, one
 Mac) and 2 (the network game's Master), with Auto Play on or off, at random skill levels
 and clock values; map
@@ -34,7 +36,8 @@ from test_turn import Recorder  # noqa: E402
 GAME_MODE, SKILL, AUTO_PLAY, CITY_COUNT, CITIES = -0x1E71, -0x2CE6, -0x120C, -0x1E4F, -0x385E
 ISLAND_POLYS = -0x1E36
 NET_PACKET = -0x1604             # the network routines' packet buffer (to -$1405)
-IGNORED = UI_GLOBALS + [(ISLAND_POLYS, 60), (NET_PACKET, 0x200)]
+UI_OPTIONS = -0x120F             # two menu options (map scrolling, battle summary)
+IGNORED = UI_GLOBALS + [(ISLAND_POLYS, 60), (NET_PACKET, 0x200), (UI_OPTIONS, 2)]
 # Globals a new game sets, filled with stale data first.
 STALE = [(-0x55C2, 48), (-0x5142, 4), (-0x513C, 1), (-0x1401, 1), (-0x2CE4, 12), (-0x1C8E, 2),
          (-0x1C90, 2), (-0x1E70, 4), (-0x2D08, 2), (-0x3672, 2400), (-0x3692, 32), (-0x386E, 16),
@@ -67,6 +70,10 @@ class NewGameRecorder(Recorder):
         self._stub(11, 0x1A8C, 0, lambda sp: None)
         self._stub(11, 0x14EE, 4, lambda sp: None)
         self._stub(11, 0x0AD0, 0, lambda sp: m.w8(sp + 4, 1))
+        self._stub(11, 0x177A, 0, lambda sp: m.w8(sp + 4, 1))
+        self._stub(11, 0x195E, 0, lambda sp: m.w8(sp + 4, 1))
+        for off in (0x007A, 0x00DA, 0x0108, 0x012C):     # menus
+            self._stub(12, off, 0, lambda sp: None)
 
         def to_slave(sp):
             self.on_request(sp + 2)
@@ -132,6 +139,18 @@ def fresh_stack(d):
     d.m.uc.mem_write(STACK_TOP - 0x2000, bytes(0x2000))
 
 
+def check_launch(d):
+    """The launch tables, built on an empty globals image."""
+    m = d.m
+    d.restore(bytes(GLOBALS_SIZE))
+
+    def launch():
+        m.call(2, 0x2DEA)
+        m.call(2, 0x2CE2, args=[("w", 1)], result="l")
+        m.call(2, 0x0004)
+    return 0 if d.check("initGlobals", launch, "initGlobals", []) else 1
+
+
 def check_parts(d, rng, cases):
     m = d.m
     bad = 0
@@ -140,6 +159,10 @@ def check_parts(d, rng, cases):
         bad += not d.check(f"clearTables {i}", lambda: m.call(2, 0x00EA), "clearTables", [])
         stale(d, rng)
         bad += not d.check(f"clearPlayerMaps {i}", lambda: m.call(2, 0x20B0), "clearPlayerMaps", [])
+        stale(d, rng)
+        m.write_global(GAME_MODE, bytes([rng.choice([0, 0, 1, 2, 3])]))
+        m.write_global(AUTO_PLAY, bytes([rng.choice([0, 1])]))
+        bad += not d.check(f"setUpControllers {i}", lambda: m.call(1, 0x1628), "setUpControllers", [])
     return bad
 
 
@@ -220,7 +243,8 @@ def run(cases, seed, verbose):
     qd = QuickDraw(d.m)
     qd.install()
     mark = d.m.heap_next
-    bad = check_parts(d, rng, 5 * cases)
+    bad = check_launch(d)
+    bad += check_parts(d, rng, 5 * cases)
     bad += check_starting_cities(d, rec, qd, mark, rng, cases, verbose)
     bad += check_new_games(d, rec, qd, mark, rng, cases, verbose)
     print(f"{d.count} checks, {bad} mismatches")

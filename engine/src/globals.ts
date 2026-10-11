@@ -24,6 +24,7 @@ export const COMBAT_TABLE = -0x55c2;
 export const TYPE_STR_IDS = -0x1324;
 export const OWN_CITY_CODE = -0x1284; // [player] -> terrain code of that player's cities
 export const OPPONENT_OF = -0x1280; // [player] -> other player
+export const INIT_DONE = -0x1277; // byte: the launch tables are in place
 
 // ----- turn state -----
 export const FOUND_ENEMY = -0x513e; // word: piece found by enemyAdjacent()

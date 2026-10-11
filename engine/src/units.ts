@@ -4,11 +4,11 @@
 import { Mem } from "./mem.ts";
 import {
   ARMY, BATTLESHIP, BOMBER, CARRIER, CITIES, CITY_COUNT, CITY_SIZE, DAY, DESTROYER, FIGHTER,
-  GAME_MODE, LOCAL_PLAYER, PIECE_COUNT, PIECE_HASH, SKILL, SUBMARINE, TRANSPORT, TYPE_STR_IDS,
+  GAME_MODE, INIT_DONE, LOCAL_PLAYER, OWN_CITY_CODE, PIECE_COUNT, PIECE_HASH, SKILL, SUBMARINE,
+  TRANSPORT, TYPE_STR_IDS,
 } from "./globals.ts";
 import { hashInsert } from "./hash.ts";
 import { inSet, setTerrain } from "./map.ts";
-import { OWN_CITY_CODE } from "./globals.ts";
 import { pieceCount } from "./query.ts";
 import {
   pieceAt, pSpotted, pOwner, pType, setCargo, setMoved, setBit5, setOrders, setOwner, setPatrol,
@@ -19,7 +19,6 @@ const TWO_PLAYER_MODES = 0x0e; // game modes 1-3
 const FAST_MODES = 0x06; // game modes 1-2
 const SURFACE = 0x7d;
 const AIRCRAFT = 0x82;
-const INIT_DONE = -0x1277;
 
 export function typeStrId(m: Mem, ptype: number): number {
   return m.sw(TYPE_STR_IDS + 2 * ptype);

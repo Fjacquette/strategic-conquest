@@ -48,6 +48,22 @@ export interface DayEnd {
 }
 
 /**
+ * CODE 1 + 0x1628: the controllers for the game mode, before the first day of a new or
+ * loaded game. Against the computer, player 1 is human and player 2 the computer, unless
+ * Auto Play is on (the computer then keeps both sides). With two players both are human and
+ * Auto Play is off. (The original also sets up its menus here.)
+ */
+export function setUpControllers(m: Mem): void {
+  const mode = m.sb(GAME_MODE);
+  if (mode === 0 && m.b(AUTO_PLAY) !== 0) return;
+  if (mode < 0 || mode > 2) return;
+  m.setB(playerMap(1) + COMPUTER_FLAG, 0);
+  m.setB(playerMap(2) + COMPUTER_FLAG, mode === 0 ? 1 : 0);
+  m.setB(AUTO_PLAY, 0);
+  m.setB(AUTO_PLAY_REQUESTED, 0);
+}
+
+/**
  * CODE 1 + 0x158C: whether `player` has anything to do, so the two-players-one-Mac game
  * hands the Mac over: any piece, or a city that completes a unit this day.
  */
@@ -69,7 +85,7 @@ export function handOffNeeded(m: Mem, player: number): boolean {
  * with no enemy city and no enemy piece beside it loses one level; at 0 the local player's
  * display is told (request 22).
  */
-export function spottedDecay(m: Mem, host: Host, owner: number): void {
+export async function spottedDecay(m: Mem, host: Host, owner: number): Promise<void> {
   const req = new Request();
   const reply = new Reply();
   req.player = m.sb(LOCAL_PLAYER);
@@ -87,7 +103,7 @@ export function spottedDecay(m: Mem, host: Host, owner: number): void {
     if (pSpotted(m, p) !== 0) continue;
     req.index = i;
     req.pos = m.w(p + 6);
-    host.request(m, req, reply);
+    await host.request(m, req, reply);
   }
 }
 
@@ -203,7 +219,7 @@ function clearLines(m: Mem, host: Host, player: number): void {
 }
 
 /** The two-players-one-Mac game hands the Mac to `player`, who then sees the day's news. */
-function handOff(m: Mem, host: Host, loop: DayLoop, player: number): void {
+async function handOff(m: Mem, host: Host, loop: DayLoop, player: number): Promise<void> {
   m.setB(LOCAL_PLAYER, player);
   m.setB(NET_TURN, player);
   loop.req.player = player;
@@ -211,14 +227,14 @@ function handOff(m: Mem, host: Host, loop: DayLoop, player: number): void {
     loop.firstHandoff = false;
   } else {
     loop.req.code = RequestCode.HIDE_MAP;
-    host.request(m, loop.req, loop.reply);
+    await host.request(m, loop.req, loop.reply);
     loop.req.code = RequestCode.HANDOFF_SCREEN;
-    host.request(m, loop.req, loop.reply);
+    await host.request(m, loop.req, loop.reply);
   }
   // CODE 1 + 0x2BB6: the player's map view is restored, and the sweep starts at region 0.
   m.setB(REGION_START, 0);
   loop.req.code = RequestCode.SHOW_MAP;
-  host.request(m, loop.req, loop.reply);
+  await host.request(m, loop.req, loop.reply);
   dayMessage(m, host, player);
   host.event(m, "battleSummary", { player });
 }
@@ -252,7 +268,7 @@ export function endChecks(m: Mem, loop: DayLoop): DayEnd {
 }
 
 /** One day: from the day count's increment to the reseeding of the game PRNG. */
-export function runDay(m: Mem, host: Host, loop: DayLoop): DayEnd {
+export async function runDay(m: Mem, host: Host, loop: DayLoop): Promise<DayEnd> {
   const mode = () => m.sb(GAME_MODE);
   m.setW(DAY, m.w(DAY) + 1);
   const day = () => m.sw(DAY);
@@ -262,7 +278,7 @@ export function runDay(m: Mem, host: Host, loop: DayLoop): DayEnd {
   if ((everyThird || early) && m.b(AUTOSAVE_OFF) === 0) host.event(m, "autosave", {});
 
   if (mode() === 1) {
-    if (handOffNeeded(m, 1)) handOff(m, host, loop, 1);
+    if (handOffNeeded(m, 1)) await handOff(m, host, loop, 1);
   } else if (mode() === 0) {
     news(m, host, 1, m.sb(LOCAL_PLAYER));
   } else if (mode() === 2) {
@@ -276,32 +292,32 @@ export function runDay(m: Mem, host: Host, loop: DayLoop): DayEnd {
     m.setB(LOCAL_PLAYER, 2);
     m.setB(NET_TURN, 2);
     swapSides(m);
-    playerTurn(m, host, 2);
+    await playerTurn(m, host, 2);
     messageA(m, host, CLEAR_LINE, 1, 2, 1, 0);
-    spottedDecay(m, host, 1);
+    await spottedDecay(m, host, 1);
     swapSides(m);
     m.setB(NET_TURN, 1);
     m.setB(LOCAL_PLAYER, 1);
   } else {
     m.setB(LOCAL_PLAYER, 1);
     m.setB(NET_TURN, 1);
-    playerTurn(m, host, 1);
-    spottedDecay(m, host, 2);
+    await playerTurn(m, host, 1);
+    await spottedDecay(m, host, 2);
     clearLines(m, host, 1);
     m.setB(NET_TURN, 2);
   }
 
   if (mode() === 1) {
-    if (handOffNeeded(m, 2)) handOff(m, host, loop, 2);
+    if (handOffNeeded(m, 2)) await handOff(m, host, loop, 2);
   }
   if (mode() === 2) {
     host.beep(m, 2);
     news(m, host, 2, 2);
   }
   host.event(m, "clearReports", {});
-  playerTurn(m, host, 2);
+  await playerTurn(m, host, 2);
   clearLines(m, host, 2);
-  spottedDecay(m, host, 1);
+  await spottedDecay(m, host, 1);
 
   const end = endChecks(m, loop);
 

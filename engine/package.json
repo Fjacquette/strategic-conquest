@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "tsc -p tsconfig.json"
+    "check": "tsc -p tsconfig.json && node test/promises.ts"
   },
   "devDependencies": {
     "@types/node": "22.15.21",
