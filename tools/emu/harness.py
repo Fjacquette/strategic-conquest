@@ -93,7 +93,8 @@ class Machine:
             0xA88A: (2, None),    # TextSize
             0xA891: (4, None),    # LineTo
             0xA893: (4, None),    # MoveTo
-            0xA89E: (4, None),    # PenPat
+            0xA89D: (4, None),    # PenPat
+            0xA89E: (0, None),    # PenNormal
             0xA8A1: (4, None),    # FrameRect
             0xA8A2: (4, None),    # PaintRect
             0xA8A3: (4, None),    # EraseRect

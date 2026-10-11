@@ -19,6 +19,10 @@ emulator on thousands of random cases (differential tests in `tools/emu/`).
 - **Players:** two, as in the original. No three-player mode.
 - **Computer opponent:** required, and should behave like the original.
 - **Turn style:** one player at a time, live, alternating, as in the original.
+- **Network play:** like the original AppleTalk game, one player's browser is the Master
+  (runs the engine for both sides) and the other's is the Slave (player 2's view and
+  orders); see [docs/network.md](docs/network.md). The two browsers connect directly,
+  set up by exchanging an invitation code and a reply code; no game server.
 - **Quirks and bugs:** each one is logged and reviewed individually before deciding whether
   to reproduce or fix it.
 - **Verification:** the new engine is checked against the original. Map generation follows
@@ -38,7 +42,7 @@ emulator on thousands of random cases (differential tests in `tools/emu/`).
 | `docs/rules/` | Game rules recovered from the code, one file per subsystem |
 | `tools/analysis/` | Resource-fork, disassembly, cross-reference and comparison scripts |
 | `tools/save/sc3save.py` | Save-file reader: text dump and map rendering |
-| `engine/` | The game engine in TypeScript: state layout, the day loop, movement, combat, units, path finding (`engine/src`); bridge used by the tests (`engine/test`) |
+| `engine/` | The game engine in TypeScript: state layout, the day loop, movement, players' orders, combat, units, path finding (`engine/src`); bridge used by the tests (`engine/test`) |
 | `tools/emu/` | Harness that runs the original routines on an emulated 68040, and differential tests of the engine against them |
 | `tools/extract.sh` | Unpacks the game archive into `build/sc301.rsrc` |
 | `emulator/` | Headless Basilisk II setup and control scripts |
@@ -63,6 +67,7 @@ pip install --break-system-packages -r tools/requirements.txt
 tools/extract.sh                                   # writes build/sc301.rsrc
 python3 -I tools/emu/test_day.py 100              # whole days: original code vs the engine
 python3 -I tools/emu/test_turn.py 500             # whole turns
+python3 -I tools/emu/test_orders.py 100           # players' commands
 python3 -I tools/emu/test_battle.py               # also test_hash, test_tools, test_path, test_units
 python3 -I tools/analysis/codeinfo.py build/sc301.rsrc
 python3 -I tools/save/sc3save.py dump saves/3.01/s04-day58-autoplay.sav

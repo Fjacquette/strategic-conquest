@@ -224,4 +224,5 @@ interface for display.
 | 21 | A step finished | — |
 | 22 | A step finished with something noteworthy (new territory, an enemy, a ship moving), a piece was destroyed, or a spotted piece faded from view | — |
 
-The controller can also end a piece's moves for the day or defer it to a later sweep.
+The controller can also end a piece's moves for the day or defer it to a later sweep. A
+human player's commands are in [orders.md](orders.md).

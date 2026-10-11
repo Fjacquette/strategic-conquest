@@ -353,6 +353,20 @@
   "10:0x0920": "SaveGame",
   "10:0x1562": "SurrenderDialog",
   "10:0x1450": "NetTurnSync",
-  "5:0x5C96": "PumpEvents"
+  "5:0x5C96": "PumpEvents",
+  "16:0x0028": "Domenu",
+  "13:0x0028": "MapClick",
+  "13:0x05B4": "MapMouseDown",
+  "15:0x0004": "SelectTarget",
+  "17:0x1364": "PointToCell",
+  "4:0x0C08": "WakeAt",
+  "18:0x1820": "ProductionDialog",
+  "18:0x0EBC": "DrawProductionDialog",
+  "18:0x14BC": "ProductionButton",
+  "5:0x5180": "HumanEvent",
+  "5:0x4EBC": "HumanMouseDown",
+  "1:0x27BC": "NextEvent",
+  "10:0x1490": "SlaveMain",
+  "10:0x0CB0": "SlaveReceive"
  }
 }

@@ -16,6 +16,8 @@ import { attack, bomberBlast } from "../src/battle.ts";
 import { playerTurn } from "../src/turn.ts";
 import { buildPiece, movesPerDay, productionDays } from "../src/units.ts";
 import { DayLoop, defeated, endChecks, handOffNeeded, runDay, spottedDecay, swapSides } from "../src/day.ts";
+import * as orders from "../src/orders.ts";
+import { Reply, Request } from "../src/host.ts";
 import { TestHost, type Action } from "./testhost.ts";
 
 type Fn = (m: Mem, args: any[], log: unknown[]) => unknown;
@@ -66,6 +68,35 @@ export const registry: Record<string, Fn> = {
     loop.decided = !!decided;
     const end = endChecks(m, loop);
     return [end.p1Defeated, end.p2Surrenders, loop.decided];
+  },
+  order: (m, [name, rec, replyInit, player, a]) => {
+    const req = new Request();
+    req.rec.set(rec);
+    const reply = new Reply();
+    reply.buf.set(replyInit);
+    const [x, y, tx, ty] = a ?? [];
+    let done = false;
+    switch (name) {
+      case "sleep": done = orders.sleep(m, req, reply, player); break;
+      case "random": done = orders.random(m, req, reply, player); break;
+      case "skip": done = orders.skip(m, reply); break;
+      case "moveLater": done = orders.moveLater(m, reply); break;
+      case "wake": orders.wake(m, x, y); break;
+      case "load": done = orders.load(m, req, reply, player, x, y); break;
+      case "aircraftDestination": done = orders.aircraftDestination(m, req, reply, player, x, y, tx, ty); break;
+      case "armyDestination": orders.armyDestination(m, player, x, y, tx, ty); break;
+      case "stackMove": done = orders.stackMove(m, req, reply, player, x, y, tx, ty); break;
+      case "patrol": done = orders.patrol(m, req, reply, player, x, y, tx, ty); break;
+      case "clickDirection": done = orders.clickDirection(req, reply, x, y); break;
+      case "goTo": done = orders.goTo(m, req, reply, player, x, y, tx, ty); break;
+      default: throw new Error(`unknown order ${name}`);
+    }
+    return [done ? 1 : 0, reply.buf[0], reply.buf[1]];
+  },
+  chooseProduction: (m, [city, type, days, ptype]) => (orders.chooseProduction(m, { city, type, days }, ptype) ? 1 : 0),
+  openProduction: (m, [x, y, owner, captured]) => {
+    const d = orders.openProduction(m, x, y, owner, !!captured);
+    return [d.city, d.type, d.days];
   },
   runDay: (m, [actions, clock, decided, firstHandoff], log) => {
     const host = new TestHost(actions as Action[], log);
