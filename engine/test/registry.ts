@@ -25,6 +25,7 @@ import { putLine, Region } from "../src/quickdraw.ts";
 import { clearPlayerMaps, clearTables, newGame, startingCities } from "../src/newgame.ts";
 import { initGlobals } from "../src/launch.ts";
 import { loadGame, saveGame } from "../src/savefile.ts";
+import { aiPlan } from "../src/ai/plan.ts";
 import { Reply, Request } from "../src/host.ts";
 import { TestHost, type Action } from "./testhost.ts";
 
@@ -124,6 +125,7 @@ export const registry: Record<string, Fn> = {
   },
   initGlobals: (m) => initGlobals(m),
   saveGame: (m) => Array.from(saveGame(m)),
+  aiPlan: (m) => aiPlan(m),
   loadGame: async (m, [file, ignore], log) => {
     const host = new TestHost([], log, ignore ?? []);
     await loadGame(m, host, Uint8Array.from(file as number[]));
