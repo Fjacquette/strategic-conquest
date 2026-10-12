@@ -4,8 +4,9 @@
  *
  * The original's user-interface and network work in the loop becomes host events and
  * requests: the hand-off screens of the two-players-one-Mac game, the day message and
- * battle summary, autosave, and the end-of-game alerts. The network game's transport
- * (game mode 2) and menu actions deferred to the end of the day are left to the host.
+ * battle summary, autosave, and the end-of-game alerts. Menu actions deferred to the end of
+ * the day are carried out by the host at the start of the next (Host.dayStart). The network
+ * game's transport (game mode 2) is left to the host.
  */
 import { Mem } from "./mem.ts";
 import {
@@ -276,6 +277,7 @@ export async function runDay(m: Mem, host: Host, loop: DayLoop): Promise<DayEnd>
   const everyThird = day() % 3 === 0 && day() > 20;
   const early = inSet(EARLY_SAVE_MODES, mode()) && day() > 10;
   if ((everyThird || early) && m.b(AUTOSAVE_OFF) === 0) host.event(m, "autosave", {});
+  await host.dayStart(m);
 
   if (mode() === 1) {
     if (handOffNeeded(m, 1)) await handOff(m, host, loop, 1);

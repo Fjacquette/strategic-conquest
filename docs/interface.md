@@ -86,3 +86,16 @@ map, or over the right half when the square is in the left half.
 
 Options > Send Message and Options > Battle Summary are disabled in single player
 (`CODE 12 + 0x00DA`); both belong to the two-player game.
+
+## Saving and resuming
+
+File > Save and Save As (`CODE 16 + 0x0158`) only set a flag: the alert says the game will
+be saved after the computer's move, and the save happens at the start of the next day
+(`CODE 10 + 0x0A8A`). Save uses the game's file if it has one; Save As asks for a new one.
+Once a game has a file, it is saved there automatically every third day after day 20
+(every day after day 10 with two players). File > Resume Game during a game waits for the
+same point; the resumed game then goes on with the day it was saved on.
+
+In the browser the game keeps its file where the browser allows that (Chrome, Edge);
+elsewhere Save offers the game as a download at the start of the next day, and there is
+no autosave. Files are in the original's format both ways.

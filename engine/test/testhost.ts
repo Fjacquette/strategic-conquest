@@ -130,6 +130,8 @@ export class TestHost implements Host {
   /** Value returned for the clock. */
   clock = 0;
 
+  async dayStart(_m: Mem): Promise<void> {}
+
   dateTime(_m: Mem): number {
     return this.clock;
   }

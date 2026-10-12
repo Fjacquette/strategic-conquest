@@ -17,7 +17,7 @@ body { margin: 0; background: var(--desk); color: var(--ink); font: 600 13px/1.2
 .mac { height: 100%; display: grid; grid-template-rows: auto 1fr; }
 
 /* Menu bar */
-.menubar { display: flex; align-items: stretch; gap: 2px; background: var(--paper); border-bottom: 1px solid var(--ink); padding-inline: 10px; height: 22px; }
+.menubar { position: relative; z-index: 30; display: flex; align-items: stretch; gap: 2px; background: var(--paper); border-bottom: 1px solid var(--ink); padding-inline: 10px; height: 22px; }
 .menu { position: relative; }
 .menu .title { height: 100%; padding: 0 10px; border: 0; background: none; font: inherit; color: inherit; cursor: default; }
 .menu.open .title { background: var(--ink); color: var(--paper); }
@@ -50,7 +50,7 @@ canvas.icon { image-rendering: pixelated; image-rendering: crisp-edges; vertical
 #map { cursor: crosshair; touch-action: none; }
 
 /* Dialogs */
-.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; }
+.overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 16px; }
 .dialog { background: var(--paper); border: 1px solid var(--ink); outline: 2px solid var(--paper); box-shadow: 0 0 0 3px var(--ink), 3px 3px 0 3px var(--ink); padding: 14px 16px; max-width: min(640px, 100%); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; }
 .dialog p { margin: 0; }
 .dialog button { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--ink); border-radius: 8px; padding: 3px 16px; min-width: 90px; cursor: default; }
@@ -88,6 +88,7 @@ canvas.icon { image-rendering: pixelated; image-rendering: crisp-edges; vertical
 .worldmap canvas { width: min(480px, 100%); height: auto; border: 1px solid var(--ink); image-rendering: auto; }
 .worldmap .info { display: flex; flex-direction: column; gap: 4px; font-family: var(--font-small); font-weight: 400; }
 .overlay[data-placed] .dialog { position: absolute; }
+.overlay[data-menus] { z-index: 20; top: 23px; }
 .dialog.pieceinfo { width: 160px; padding: 6px 10px 10px; gap: 4px; box-shadow: 2px 2px 0 var(--ink); outline: 0; }
 .pieceinfo .title { display: flex; justify-content: space-between; align-items: center; }
 .pieceinfo .row { display: flex; white-space: nowrap; }
@@ -102,8 +103,9 @@ canvas.icon { image-rendering: pixelated; image-rendering: crisp-edges; vertical
   <nav class="menubar" id="menubar" aria-label="Menus">
     <div class="menu"><button class="title" type="button">File</button><div class="items">
       <button type="button" data-cmd="new">New Game…</button>
-      <button type="button" data-cmd="resume" disabled>Resume Game…</button>
+      <button type="button" data-cmd="resume">Resume Game…</button>
       <button type="button" data-cmd="save" disabled>Save</button>
+      <button type="button" data-cmd="saveas" disabled>Save as…</button>
     </div></div>
     <div class="menu"><button class="title" type="button">Moves</button><div class="items">
       <button type="button" data-cmd="key:s">Sleep <kbd>S</kbd></button>

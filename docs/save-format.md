@@ -14,7 +14,16 @@ human player's current sight appear only on the right, because the game hides th
 ## General
 
 - 11,381 bytes, data fork only. Mac type `SC∂ `, creator `SCÆ `.
-- Written only at the end of a round. Loading is also deferred to the end of the round.
+- Written only at the start of a day, after the day count has gone up (`CODE 1 + 0x1A18`;
+  the menu's Save waits for it, and so does the autosave). The saved day is the day about
+  to be played. Loading during a game is also deferred to that point; loading at start-up
+  happens before the day loop counts the day up (quirk [Q15](quirks.md)).
+- The loader (`CODE 1 + 0x09D2`) clears the piece table, reads seed, game mode and skill
+  level, generates the world again from them (rebuilding the island map), reads the rest,
+  runs the computer opponent's start-of-game analysis when playing against the computer
+  (before its saved data is read back over it), recounts each island's cities, and compacts
+  the piece table (rebuilding the position hash). `engine/src/savefile.ts` does the same;
+  `tools/emu/test_savefile.py` checks it, and the writer, against the original.
 - The file is a straight dump of 23 global variables: the save routine (Gstart,
   `CODE 10 + 0x0542..0x07FA`) writes them with FSWrite, and the load routine (Main,
   `CODE 1 + 0x0A9A..0x0DD2`) reads them back in the same order.

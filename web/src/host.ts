@@ -8,12 +8,16 @@
  * Showing a fight also changes the game, as in the original: the attacker becomes spotted,
  * and an Army's fight draws a number from QuickDraw's generator (see docs/interface.md).
  * The computer opponent is not ported yet: its pieces stay where they are.
+ *
+ * File menu actions wait for the start of the next day, as in the original: saving, and
+ * resuming a saved game.
  */
 import { Mem } from "../../engine/src/mem.ts";
 import {
-  ARMY, BOMBER, CARRIER, DAY, EMPTY, FIGHTER, GAME_MODE, LOCAL_PLAYER, MOVES_LEFT, OPPONENT_OF, OWN_CITY_CODE, PIECE_DONE,
-  REMOVED, TRANSPORT, WATER,
+  ARMY, AUTOSAVE_OFF, BOMBER, CARRIER, DAY, EMPTY, FIGHTER, GAME_MODE, LOCAL_PLAYER, MOVES_LEFT, NET_TURN, OPPONENT_OF,
+  OWN_CITY_CODE, PIECE_DONE, REMOVED, TRANSPORT, WATER,
 } from "../../engine/src/globals.ts";
+import { setUpControllers } from "../../engine/src/day.ts";
 import { type Host, type Message, Reply, Request, RequestCode } from "../../engine/src/host.ts";
 import { topPieceAt } from "../../engine/src/hash.ts";
 import { explored, isComputer, terrainAt, terrainNear } from "../../engine/src/map.ts";
@@ -23,7 +27,9 @@ import {
 } from "../../engine/src/piece.ts";
 import { enemyAdjacent, foundEnemy, ownPiecesAt, pieceCount } from "../../engine/src/query.ts";
 import { qdRandom } from "../../engine/src/random.ts";
+import { loadGame, SAVE_SIZE, saveGame } from "../../engine/src/savefile.ts";
 import { cityRec, productionDays } from "../../engine/src/units.ts";
+import { GameFile } from "./files.ts";
 import { Input } from "./input.ts";
 import { CH, CW, MapView, RULER_LEFT, RULER_TOP } from "./mapview.ts";
 import { BATTLE, BLAST, EXPLOSION, Sound } from "./sound.ts";
@@ -57,6 +63,10 @@ export class BrowserHost implements Host {
   /** The square the map was last brought into view for (CODE 13 + 0x0A38 keeps it). */
   private shown: [number, number] | null = null;
   private drawPending = false;
+  /** The game's save file. */
+  readonly file: GameFile;
+  /** File menu actions waiting for the start of the next day (CODE 1 + 0x1A18). */
+  private pending: { save: boolean; resume: Uint8Array | null } = { save: false, resume: null };
 
   constructor(ui: UI, view: MapView, input: Input, words: Words, sound: Sound) {
     this.ui = ui;
@@ -64,6 +74,84 @@ export class BrowserHost implements Host {
     this.input = input;
     this.words = words;
     this.sound = sound;
+    this.file = new GameFile(words.str(20) || "Saved Game");
+  }
+
+  // ----- saving and resuming -----
+
+  /**
+   * File > Save and Save As (CODE 16 + 0x0158): the game is saved at the start of the next
+   * day, the only time the original saves. Save As, or Save with no file yet, asks where
+   * first; this must run while handling the menu click.
+   */
+  async menuSave(saveAs: boolean): Promise<void> {
+    if ((saveAs || !this.file.chosen) && !(await this.file.chooseSave())) return;
+    const d = this.words.dialog(302);
+    await this.ui.notice(d.text, d.buttons[0] ?? "OK");
+    this.pending.save = true;
+  }
+
+  /**
+   * File > Resume Game while a game is being played (CODE 16 + 0x0132): the saved game
+   * takes over at the start of the next day. Runs while handling the menu click.
+   */
+  async menuResume(): Promise<void> {
+    const chosen = await this.chooseSavedGame();
+    if (!chosen) return;
+    if ("problem" in chosen) {
+      await this.ui.notice(chosen.problem);
+      return;
+    }
+    const d = this.words.dialog(304);
+    if (await this.ui.ask(d.text, d.buttons[0] ?? "OK", d.buttons[1] ?? "Cancel")) this.pending.resume = chosen.bytes;
+  }
+
+  /**
+   * A saved game the player picks (while handling a click): its bytes, why it cannot be
+   * played here, or null if none was picked.
+   */
+  async chooseSavedGame(): Promise<{ bytes: Uint8Array } | { problem: string } | null> {
+    const bytes = await this.file.chooseOpen();
+    if (!bytes) return null;
+    if (bytes.length < SAVE_SIZE) return { problem: "That file is not a Strategic Conquest saved game." };
+    if (bytes[4] !== 0) return { problem: "That saved game is a two-player game. Only games against the computer can be resumed so far." };
+    return { bytes };
+  }
+
+  /** CODE 1 + 0x1A18: the File menu actions deferred to the start of the day. */
+  async dayStart(m: Mem): Promise<void> {
+    if (this.pending.save) {
+      this.pending.save = false;
+      await this.save(m);
+    }
+    const resume = this.pending.resume;
+    if (resume) {
+      this.pending.resume = null;
+      await this.resume(m, resume);
+    }
+  }
+
+  /** CODE 10 + 0x0920: save the game to its file, or offer it as a download. */
+  private async save(m: Mem): Promise<void> {
+    m.setB(AUTOSAVE_OFF, 0);
+    const bytes = saveGame(m);
+    if (await this.file.write(bytes)) return;
+    await this.ui.notice(`${this.words.str(19)} ${this.file.name}`, "Save");
+    this.file.download(bytes);
+  }
+
+  /**
+   * A saved game replaces this one (CODE 10 + 0x0A8A); the day goes on with it, starting
+   * with player 1's turn.
+   */
+  async resume(m: Mem, bytes: Uint8Array): Promise<void> {
+    m.setB(LOCAL_PLAYER, 1);
+    m.setB(NET_TURN, 1);
+    this.view.forget();
+    this.shown = null;
+    await loadGame(m, this, bytes);
+    setUpControllers(m);
+    this.view.draw(m);
   }
 
   /** Redraw at the next frame. */
@@ -430,11 +518,17 @@ export class BrowserHost implements Host {
 
   report(_m: Mem, _entry: Record<string, number>): void {}
 
-  /** The engine's "sound" event is the system beep (CODE 1 + 0x123E). */
-  event(_m: Mem, name: string, _data: Record<string, number>): void {
-    if (name !== "sound") return;
-    this.sound.stop();
-    this.sound.beep();
+  /**
+   * The engine's "sound" event is the system beep (CODE 1 + 0x123E). The autosave writes
+   * the game to its file, when it has one the browser lets it write.
+   */
+  event(m: Mem, name: string, _data: Record<string, number>): void {
+    if (name === "sound") {
+      this.sound.stop();
+      this.sound.beep();
+    } else if (name === "autosave" && this.file.chosen) {
+      void this.file.write(saveGame(m));
+    }
   }
 
   aiPlan(_m: Mem): void {}

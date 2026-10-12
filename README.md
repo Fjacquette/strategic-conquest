@@ -35,7 +35,7 @@ emulator on thousands of random cases (differential tests in `tools/emu/`).
 | Path | Contents |
 |---|---|
 | `docs/findings.md` | What is known about the 3.01 binary: segments, compiler, randomness, resources |
-| `docs/save-format.md` | Save-file structure, as mapped so far |
+| `docs/save-format.md` | Save-file structure, and how the original saves and loads |
 | `docs/versions.md` | 2.055 vs 3.01 comparison |
 | `docs/network.md` | The original's AppleTalk Master/Slave design |
 | `docs/interface.md` | What the original's interface does besides drawing: sounds, the fight and blast displays |
@@ -75,6 +75,7 @@ python3 -I tools/emu/test_orders.py 100           # players' commands
 python3 -I tools/emu/test_mapgen.py 50            # map generation
 python3 -I tools/emu/test_savemaps.py saves/3.01/*.sav   # worlds of real games, from their seeds
 python3 -I tools/emu/test_newgame.py 20           # starting a new game
+python3 -I tools/emu/test_savefile.py 20          # saving and loading games
 python3 -I tools/emu/test_battle.py               # also test_hash, test_tools, test_path, test_units
 python3 -I tools/analysis/codeinfo.py build/sc301.rsrc
 python3 -I tools/save/sc3save.py dump saves/3.01/s04-day58-autoplay.sav

@@ -134,6 +134,13 @@ export interface Host {
    * current; called for each side, the sides being swapped in between.
    */
   aiNewSide(m: Mem): void;
+  /**
+   * CODE 1 + 0x1A18: the start of a day, after the autosave, where the original carries out
+   * menu actions deferred until the day's end (CODE 10 + 0x0A8A): saving, resuming a saved
+   * game, starting a new game, quitting. A resumed game replaces the globals; the day goes
+   * on with it.
+   */
+  dayStart(m: Mem): Promise<void>;
   /** The clock (ReadDateTime: seconds since 1904) that reseeds the game PRNG each day. */
   dateTime(m: Mem): number;
 }

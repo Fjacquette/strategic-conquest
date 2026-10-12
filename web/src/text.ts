@@ -1,6 +1,7 @@
 /**
- * The words the game shows. They come from the owner's copy of the game (its STR resources,
- * extracted with the artwork); messages use the original's numbering and substitutions.
+ * The words the game shows. They come from the owner's copy of the game (its STR and DITL
+ * resources, extracted with the artwork); messages use the original's numbering and
+ * substitutions.
  */
 import type { Message } from "../../engine/src/host.ts";
 import { pCargo, pStrength, pType } from "../../engine/src/piece.ts";
@@ -12,11 +13,26 @@ const TYPE_STR = [1, 2, 3, 4, 6, 5, 7, 8];
 /** Messages whose ^0 is a type name (the STR number of the name), from messageB(). */
 const NAMED = new Set([1003, 1006, 1012, 1019, 1033]);
 
+/** A dialog's words: its text and its buttons' labels. */
+export interface DialogWords {
+  text: string;
+  buttons: string[];
+}
+
 export class Words {
   private readonly strings: Record<string, string>;
+  private readonly dialogs: Record<string, [number, string][]>;
 
-  constructor(strings: Record<string, string>) {
+  constructor(strings: Record<string, string>, dialogs: Record<string, [number, string][]>) {
     this.strings = strings;
+    this.dialogs = dialogs;
+  }
+
+  /** The texts of dialog item list `id`: its static text, and its buttons in order. */
+  dialog(id: number): DialogWords {
+    const items = this.dialogs[id] ?? [];
+    const text = items.filter(([kind]) => kind === 8).map(([, t]) => t.replace(/\r/g, "\n").trim()).filter((t) => t);
+    return { text: text.join("\n"), buttons: items.filter(([kind]) => kind === 4).map(([, t]) => t) };
   }
 
   str(id: number): string {

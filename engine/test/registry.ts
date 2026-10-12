@@ -24,6 +24,7 @@ import { coastalCity, generateMap, inlandCity, islandOutline, placeCity, scatter
 import { putLine, Region } from "../src/quickdraw.ts";
 import { clearPlayerMaps, clearTables, newGame, startingCities } from "../src/newgame.ts";
 import { initGlobals } from "../src/launch.ts";
+import { loadGame, saveGame } from "../src/savefile.ts";
 import { Reply, Request } from "../src/host.ts";
 import { TestHost, type Action } from "./testhost.ts";
 
@@ -122,6 +123,11 @@ export const registry: Record<string, Fn> = {
     return [r.points, [b.top, b.left, b.bottom, b.right]];
   },
   initGlobals: (m) => initGlobals(m),
+  saveGame: (m) => Array.from(saveGame(m)),
+  loadGame: async (m, [file, ignore], log) => {
+    const host = new TestHost([], log, ignore ?? []);
+    await loadGame(m, host, Uint8Array.from(file as number[]));
+  },
   setUpControllers: (m) => setUpControllers(m),
   clearTables: (m) => clearTables(m),
   clearPlayerMaps: (m) => clearPlayerMaps(m),

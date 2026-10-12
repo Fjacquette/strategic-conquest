@@ -12,6 +12,8 @@ export interface Assets {
   sounds: Record<string, string>;
   /** STR resources: the game's words. */
   strings: Record<string, string>;
+  /** DITL resources: each dialog's item texts as [item type, text] (4 button, 8 static text). */
+  dialogs: Record<string, [number, string][]>;
 }
 
 declare global {

@@ -7,7 +7,8 @@ Usage: python3 -I tools/assets/extract_assets.py [build/sc301.rsrc] [web/assets/
 Writes:
   assets.json     the bitmaps and patterns as numbers, for the web build: "bits" maps each
                   BITS id to its 12 row words (16 pixels wide, most significant bit left),
-                  "pats" each PAT id to its 8 row bytes, "strings" each STR id to its text
+                  "pats" each PAT id to its 8 row bytes, "strings" each STR id to its text,
+                  "dialogs" each DITL id to its items' texts ([item type, text], in order)
   bits-<id>.png   the 39 BITS bitmaps (16 x 12, 1 bit: black pixels opaque, white transparent)
   pat-<id>.png    the PAT patterns (8 x 8)
   <name>.wav      the five sampled sounds ('snd ' format 2, 8-bit)
@@ -68,12 +69,28 @@ def snd_samples(data):
     return rate / 65536.0, data[offset + 22:offset + 22 + length]
 
 
+def ditl_items(data):
+    """A dialog item list's items as [type, text]: buttons (4), static (8) and edit (16) text."""
+    count = struct.unpack(">h", data[:2])[0] + 1
+    pos, items = 2, []
+    for _ in range(count):
+        pos += 12                        # handle placeholder, bounds
+        kind, length = data[pos] & 0x7F, data[pos + 1]
+        body = data[pos + 2:pos + 2 + length]
+        pos += 2 + length + (length & 1)
+        if kind in (4, 5, 6, 8, 16):
+            items.append([kind, body.decode("mac_roman")])
+    return items
+
+
 def main(src, out):
     rf = rsrcfork.open(src, fork="data")
     os.makedirs(out, exist_ok=True)
     black, clear = (0, 0, 0, 255), (0, 0, 0, 0)
     sheet = []
-    numbers = {"bits": {}, "pats": {}, "strings": {}}
+    numbers = {"bits": {}, "pats": {}, "strings": {}, "dialogs": {}}
+    for rid in sorted(rf[b"DITL"].keys()):
+        numbers["dialogs"][str(rid)] = ditl_items(rf[b"DITL"][rid].data_raw)
     for rid in sorted(rf[b"STR "].keys()):
         d = rf[b"STR "][rid].data_raw
         numbers["strings"][str(rid)] = d[1:1 + d[0]].decode("mac_roman")

@@ -109,6 +109,17 @@ export class UI {
     this.openMenu = null;
   }
 
+  /** Enable or disable a menu item. */
+  enable(cmd: string, on: boolean): void {
+    const item = this.menubar.querySelector<HTMLButtonElement>(`[data-cmd="${cmd}"]`);
+    if (item) item.disabled = !on;
+  }
+
+  /** Close whatever dialog is open, without an answer. */
+  dismiss(): void {
+    if (this.modal) this.close();
+  }
+
   /** Tick or untick a menu item. */
   check(cmd: string, on: boolean): void {
     this.menubar.querySelector(`[data-cmd="${cmd}"]`)?.classList.toggle("checked", on);
@@ -139,6 +150,7 @@ export class UI {
   private close(): void {
     this.overlay.hidden = true;
     delete this.overlay.dataset.placed;
+    delete this.overlay.dataset.menus;
     this.dialog.removeAttribute("style");
     this.dialog.replaceChildren();
     for (const w of this.closedWaiters.splice(0)) w();
@@ -211,6 +223,8 @@ export class UI {
   setup(): Promise<number> {
     return new Promise((resolve) => {
       this.open((d) => {
+        // The menus stay usable, for File > Resume Game.
+        this.overlay.dataset.menus = "";
         d.classList.value = "dialog setup";
         const modes = el("div", { class: "modes", role: "radiogroup" });
         const options: [string, boolean][] = [["Single Player Game", true], ["Network Game (coming)", false]];

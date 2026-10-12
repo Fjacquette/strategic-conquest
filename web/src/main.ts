@@ -50,7 +50,7 @@ function start(): void {
     document.getElementById("mac")?.replaceChildren(box);
     return;
   }
-  const words = new Words(A.strings);
+  const words = new Words(A.strings, A.dialogs ?? {});
   const ui = new UI(A, words);
   const view = new MapView(
     document.getElementById("map") as HTMLCanvasElement,
@@ -87,9 +87,34 @@ function start(): void {
     if (e.key === "-" || e.key === "_") zoom(-1);
   });
 
+  // The game starts from the setup dialog, or from a saved game chosen while it is shown.
+  let begin: (choice: StartChoice) => void = () => {};
+  const started = new Promise<StartChoice>((resolve) => { begin = resolve; });
+  const setup = () => { void ui.setup().then((skill) => begin({ skill, saved: null })); };
+
   const commands: Record<string, () => void | Promise<void>> = {
     new: async () => {
       if (await ui.ask(words.str(1027), "OK", "Cancel")) location.reload();
+    },
+    resume: async () => {
+      if (host.m) {
+        await host.menuResume();
+        return;
+      }
+      const chosen = await host.chooseSavedGame();
+      if (!chosen) return;
+      if ("bytes" in chosen) {
+        begin({ skill: 0, saved: chosen.bytes });
+      } else {
+        await ui.notice(chosen.problem);
+        setup();
+      }
+    },
+    save: async () => {
+      if (host.m) await host.menuSave(false);
+    },
+    saveas: async () => {
+      if (host.m) await host.menuSave(true);
     },
     current: () => host.showCurrent(),
     pieceinfo: async () => {
@@ -127,7 +152,9 @@ function start(): void {
     else void commands[cmd]?.();
   });
 
-  void main(ui, view, host, words);
+  preview(view);
+  setup();
+  void main(ui, view, host, words, started);
 }
 
 /** The player's cities and the computer's. */
@@ -168,25 +195,39 @@ function preview(view: MapView): void {
   view.draw(m);
 }
 
-async function main(ui: UI, view: MapView, host: BrowserHost, words: Words): Promise<void> {
-  preview(view);
-  const skill = await ui.setup();
+/** How a game starts: a new game at a skill level, or a saved game. */
+interface StartChoice {
+  skill: number;
+  saved: Uint8Array | null;
+}
+
+async function main(ui: UI, view: MapView, host: BrowserHost, words: Words, started: Promise<StartChoice>): Promise<void> {
+  const start = await started;
+  ui.dismiss();
   view.revealAll = false;
+  ui.enable("save", true);
+  ui.enable("saveas", true);
 
   const m = new Mem(new Uint8Array(GLOBALS_SIZE));
   initGlobals(m);
-  m.setB(GAME_MODE, 0);
-  m.setB(SKILL, skill);
-  m.setB(playerMap(1) + COMPUTER_FLAG, 0);
-  m.setB(playerMap(2) + COMPUTER_FLAG, 1);
-  m.setB(AUTO_PLAY, 0);
-  m.setB(LOCAL_PLAYER, 1);
-  m.setB(NET_TURN, 1);
-  m.setW(DAY, 1);
   host.m = m;
-  await newGame(m, host);
-  m.setB(AUTOSAVE_OFF, 1);
-  setUpControllers(m);
+  if (start.saved) {
+    // As when the original is opened with a saved game, the day loop then counts the day
+    // up before the first turn (quirk Q15).
+    await host.resume(m, start.saved);
+  } else {
+    m.setB(GAME_MODE, 0);
+    m.setB(SKILL, start.skill);
+    m.setB(playerMap(1) + COMPUTER_FLAG, 0);
+    m.setB(playerMap(2) + COMPUTER_FLAG, 1);
+    m.setB(AUTO_PLAY, 0);
+    m.setB(LOCAL_PLAYER, 1);
+    m.setB(NET_TURN, 1);
+    m.setW(DAY, 1);
+    await newGame(m, host);
+    m.setB(AUTOSAVE_OFF, 1);
+    setUpControllers(m);
+  }
 
   const loop = new DayLoop();
   for (;;) {

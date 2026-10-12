@@ -174,6 +174,15 @@ export class MapView {
     this.rulerLeft.getContext("2d")?.putImageData(left.image, 0, 0);
   }
 
+  /** Forget what was shown of a game (another game takes over). */
+  forget(): void {
+    this.facing.clear();
+    this.focus = 0;
+    this.flashOff = false;
+    this.inverted = null;
+    this.blast = null;
+  }
+
   /** A piece moved from `from` (a position word): it now faces the way it went. */
   noteMove(m: Mem, idx: number, from: number): void {
     const p = pieceAt(idx);
