@@ -26,6 +26,10 @@ import { clearPlayerMaps, clearTables, newGame, startingCities } from "../src/ne
 import { initGlobals } from "../src/launch.ts";
 import { loadGame, saveGame } from "../src/savefile.ts";
 import { aiPlan } from "../src/ai/plan.ts";
+import { aiNewGame, aiNewSide } from "../src/ai/setup.ts";
+import { aiFocus, aiIslandReview, aiNewPiece, aiProduction, wakeLightTransports } from "../src/ai/production.ts";
+import { aiTransport } from "../src/ai/transports.ts";
+import { aiSurvey, wakeTransports } from "../src/ai/survey.ts";
 import { Reply, Request } from "../src/host.ts";
 import { TestHost, type Action } from "./testhost.ts";
 
@@ -126,6 +130,16 @@ export const registry: Record<string, Fn> = {
   initGlobals: (m) => initGlobals(m),
   saveGame: (m) => Array.from(saveGame(m)),
   aiPlan: (m) => aiPlan(m),
+  aiNewGame: (m) => aiNewGame(m),
+  aiNewSide: (m) => aiNewSide(m),
+  aiNewPiece: (m, [city]) => aiNewPiece(m, city),
+  aiSurvey: (m) => aiSurvey(m),
+  aiProduction: (m) => aiProduction(m),
+  aiIslandReview: (m, [_rec, island]) => aiIslandReview(m, island),
+  wakeLightTransports: (m) => wakeLightTransports(m),
+  aiFocus: (m) => aiFocus(m),
+  aiTransport: (m, [_p, idx]) => aiTransport(m, idx),
+  wakeTransports: (m) => wakeTransports(m),
   loadGame: async (m, [file, ignore], log) => {
     const host = new TestHost([], log, ignore ?? []);
     await loadGame(m, host, Uint8Array.from(file as number[]));

@@ -25,6 +25,30 @@ IGNORED = set()
 for _off, _size in UI_GLOBALS:
     IGNORED.update(range(_off, _off + _size))
 
+ISLAND_BOUNDS = -0x1E36
+
+
+def island_bounds(m):
+    """The engine's form of the island polygons (engine/src/mapgen.ts ISLAND_BOUNDS): for
+    islands 1-15, the polygon's bounding box divided into squares, from the original's
+    polygon handles in the emulator."""
+    out = bytearray(60)
+    for i in range(15):
+        handle = m.r32(m.g(ISLAND_BOUNDS) + 4 * i)
+        if not handle:
+            continue
+        top, left, bottom, right = struct.unpack(">4h", m.uc.mem_read(m.r32(handle) + 2, 8))
+        vals = [int(top / 12) + 1, int(left / 16) + 1, int(bottom / 12) + 1, int(right / 16) + 1]
+        out[4 * i:4 * i + 4] = bytes(v & 0xFF for v in vals)
+    return bytes(out)
+
+
+def with_bounds(image, bounds):
+    data = bytearray(image)
+    k = GLOBALS_SIZE + ISLAND_BOUNDS
+    data[k:k + 60] = bounds
+    return bytes(data)
+
 
 def words(fmt):
     """Decode Pascal arguments: `fmt` lists them in declaration order ('b' byte, 'w' word,
@@ -52,12 +76,23 @@ def argbytes(fmt):
 # name: (segment, offset, argument format, result kind, engine routine)
 ROUTINES = {
     "aiPlan": (7, 0x11EA, "", None, "aiPlan"),
+    "aiNewGame": (2, 0x2E3A, "", None, "aiNewGame"),
+    "aiNewSide": (2, 0x24DE, "", None, "aiNewSide"),
+    "aiNewPiece": (1, 0x0626, "b", None, "aiNewPiece"),
+    "aiSurvey": (1, 0x0702, "", None, "aiSurvey"),
+    "wakeTransports": (1, 0x078A, "", None, "wakeTransports"),
+    "aiProduction": (6, 0x4C72, "", None, "aiProduction"),
+    "aiIslandReview": (7, 0x13AE, "lb", None, "aiIslandReview"),
+    "wakeLightTransports": (1, 0x0850, "", None, "wakeLightTransports"),
+    "aiFocus": (6, 0x5630, "", None, "aiFocus"),
+    "aiTransport": (6, 0x4928, "lw", None, "aiTransport"),
 }
 
 
-def compare(js, names, name, spec, call):
+def compare(js, names, name, spec, call, bounds):
     seg, off, fmt, result, fn = spec
     args = words(fmt)(call["args"]) if fmt else []
+    call = dict(call, before=with_bounds(call["before"], bounds), after=with_bounds(call["after"], bounds))
     res, mem, _ = js.call(fn, call["before"], args)
     problems = []
     if result is not None:
@@ -84,12 +119,13 @@ def run(games, days, seed, only, verbose):
         auto = gi % 2 == 0
         caps = {k: Capture(g.m, v[0], v[1], argbytes(v[2]), v[3], limit=60) for k, v in targets.items()}
         g.new_game(skill=g.rng.randint(1, 10), auto_play=auto)
+        bounds = island_bounds(g.m)
         for _ in range(days):
             g.day()
         for name, cap in caps.items():
             for i, call in enumerate(cap.calls):
                 checks += 1
-                problems = compare(js, names, name, targets[name], call)
+                problems = compare(js, names, name, targets[name], call, bounds)
                 if problems:
                     bad += 1
                     print(f"MISMATCH {name} game {gi} call {i}")

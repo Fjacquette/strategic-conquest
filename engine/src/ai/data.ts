@@ -20,6 +20,19 @@ export const IS_STATUS = 14; // bits 0-1: the island's standing, counted by AIPl
 export const BUILDING = [-0x1c1d, -0x1c1e, -0x1c20, -0x1c1f, -0x1c22, -0x1c21, -0x1c23, -0x1c24];
 export const BUILDING_TOTAL = -0x1c1c;
 
+/** The side's nine planning words (cleared at the start of a game). */
+export const SIDE_WORDS = [-0x1c0c, -0x1c0e, -0x1c10, -0x1c12, -0x1c14, -0x1c16, -0x1c18, -0x1c1a];
+
+/** A word per island (16). */
+export const ISLAND_WORDS = -0x1c4e;
+/** A byte per island (16). */
+export const ISLAND_BYTES = -0x1c5e;
+/** A byte per city (46). */
+export const CITY_MARKS = -0x1c8c;
+
+/** The side's pieces of each type, by piece type (words). */
+export const PIECES_OF = [-0x1c0c, -0x1c0e, -0x1c12, -0x1c10, -0x1c16, -0x1c14, -0x1c18, -0x1c1a];
+
 /** How many islands have each status (0-3). */
 export const ISLANDS_BY_STATUS = [-0x1c25, -0x1c29, -0x1c2a, -0x1c2b];
 

@@ -326,11 +326,27 @@ export function scatterCities(m: Mem): void {
 }
 
 /**
+ * Where the original keeps each island's polygon (A5-$1E36, a handle for each of islands
+ * 1-15), the engine keeps what the computer opponent takes from it (CODE 8 + 0x0004): the
+ * polygon's bounding box in squares, as four signed bytes per island: top / 12 + 1,
+ * left / 16 + 1, bottom / 12 + 1, right / 16 + 1 (the box's pixel edges, divided with
+ * truncation).
+ */
+export const ISLAND_BOUNDS = -0x1e36;
+
+/** The polygon bounds of an island outline, in the form ISLAND_BOUNDS keeps. */
+export function outlineBounds(outline: Outline): [number, number, number, number] {
+  const hs = outline.map(([h]) => h), vs = outline.map(([, v]) => v);
+  const t = Math.trunc;
+  return [t(Math.min(...vs) / 12) + 1, t(Math.min(...hs) / 16) + 1, t(Math.max(...vs) / 12) + 1, t(Math.max(...hs) / 16) + 1];
+}
+
+/**
  * CODE 2 + 0x1CDC: generate the world from the game seed, which also seeds both random
  * generators. Up to 16 tries to place the home islands (the original then gives up with an
- * alert and quits). Returns the island outlines, which the original keeps as polygons
- * (A5-$1E36): they are passed to the computer opponent (CODE 8 + 0x0004) and drawn by
- * CODE 17. They follow from the seed, so they are not saved.
+ * alert and quits). Returns the island outlines, which the original keeps as polygons: they
+ * are drawn by CODE 17, and the computer opponent uses their bounds (ISLAND_BOUNDS). They
+ * follow from the seed, so they are not saved.
  */
 export function generateMap(m: Mem): (Outline | null)[] {
   m.setL(QD_RANDSEED, m.l(GAME_SEED));
@@ -361,5 +377,10 @@ export function generateMap(m: Mem): (Outline | null)[] {
     m.setB(ISLAND_COUNT, island);
   }
   scatterCities(m);
+  for (let island = 1; island <= 15; island++) {
+    const outline = islands.outlines[island];
+    const bounds = outline ? outlineBounds(outline) : [0, 0, 0, 0];
+    bounds.forEach((v, k) => m.setB(ISLAND_BOUNDS + 4 * (island - 1) + k, v));
+  }
   return islands.outlines;
 }
