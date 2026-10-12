@@ -26,3 +26,8 @@ export function qdRandom(m: Mem): number {
   const r = s16(seed & 0xffff);
   return r === -32768 ? 0 : r;
 }
+
+/** CODE 1 + 0x068E: a coin toss from QuickDraw Random (true when it is negative). */
+export function randomBool(m: Mem): boolean {
+  return qdRandom(m) < 0;
+}

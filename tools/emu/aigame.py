@@ -61,10 +61,14 @@ class Capture:
     at entry, and at return the globals and the function result (`result`: None, "b", "w"
     or "l", the size of the slot above the arguments). At most `limit` calls are kept,
     spread over the whole game: when the list fills, every other call is dropped and only
-    every other call is recorded from then on."""
+    every other call is recorded from then on.
 
-    def __init__(self, m, seg, off, argbytes, result=None, limit=200):
+    `enter(m, raw)` and `leave(m, raw)`, given the argument bytes, read what the arguments
+    point to at entry (kept as call["argv"]) and at return (call["out"])."""
+
+    def __init__(self, m, seg, off, argbytes, result=None, limit=200, enter=None, leave=None):
         self.m, self.argbytes, self.result, self.limit = m, argbytes, result, limit
+        self.on_enter, self.on_leave = enter, leave
         self.calls = []
         self.pending = []
         self.seen = 0
@@ -81,7 +85,10 @@ class Capture:
         m = self.m
         sp = uc.reg_read(UC_M68K_REG_A7)
         ret = m.r32(sp)
-        call = {"before": read_globals(m), "args": bytes(m.uc.mem_read(sp + 4, self.argbytes)), "sp": sp}
+        raw = bytes(m.uc.mem_read(sp + 4, self.argbytes))
+        call = {"before": read_globals(m), "args": raw, "sp": sp}
+        if self.on_enter:
+            call["argv"] = self.on_enter(m, raw)
         self.pending.append(call)
 
         def leave(uc2, address2, size2, _2):
@@ -90,6 +97,8 @@ class Capture:
             uc2.hook_del(handle[0])
             self.pending.remove(call)
             call["after"] = read_globals(m)
+            if self.on_leave:
+                call["out"] = self.on_leave(m, call["args"])
             slot = sp + 4 + self.argbytes
             if self.result == "l":
                 call["result"] = m.r32(slot)

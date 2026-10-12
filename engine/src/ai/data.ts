@@ -30,6 +30,17 @@ export const ISLAND_BYTES = -0x1c5e;
 /** A byte per city (46). */
 export const CITY_MARKS = -0x1c8c;
 
+/**
+ * Per city (words): how many Armies have been sent to take it, and the shortest distance
+ * from which one was sent (5000 when none). The survey resets them.
+ */
+export const CITY_SENT = -0x1cee;
+export const CITY_SENT_DISTANCE = -0x1d4a;
+
+/** The step the computer chose for the piece it is moving (signed bytes). */
+export const REPLY_DX = -0x1bff;
+export const REPLY_DY = -0x1bfe;
+
 /** The side's pieces of each type, by piece type (words). */
 export const PIECES_OF = [-0x1c0c, -0x1c0e, -0x1c12, -0x1c10, -0x1c16, -0x1c14, -0x1c18, -0x1c1a];
 

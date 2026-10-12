@@ -50,30 +50,72 @@ def with_bounds(image, bounds):
     return bytes(data)
 
 
-def words(fmt):
-    """Decode Pascal arguments: `fmt` lists them in declaration order ('b' byte, 'w' word,
-    'l' long); the last declared is nearest the stack pointer."""
-    def decode(raw):
-        out, pos = [], 0
-        for kind in reversed(fmt):
-            if kind == "l":
-                out.append(struct.unpack(">i", raw[pos:pos + 4])[0])
-                pos += 4
-            elif kind == "w":
-                out.append(struct.unpack(">h", raw[pos:pos + 2])[0])
-                pos += 2
-            else:
-                out.append(struct.unpack(">b", raw[pos:pos + 1])[0])
-                pos += 2
-        return list(reversed(out))
-    return decode
+PIECES = -0x5138
+
+
+def signed(b):
+    return b - 256 if b > 127 else b
+
+
+def arg_slots(fmt):
+    """(kind, offset in the argument bytes) of each Pascal argument, in declaration order:
+    the last declared is nearest the stack pointer. Kinds: 'b' byte, 'w' word, 'l' long,
+    'p' pointer to a piece, 'q' pointer to a request record, 'r' pointer to a reply."""
+    slots, pos = [], 0
+    for kind in reversed(fmt):
+        slots.append((kind, pos))
+        pos += 2 if kind in "bw" else 4
+    return list(reversed(slots))
 
 
 def argbytes(fmt):
-    return sum(4 if k == "l" else 2 for k in fmt)
+    return sum(2 if k in "bw" else 4 for k in fmt)
 
 
-# name: (segment, offset, argument format, result kind, engine routine)
+def read_args(fmt):
+    """The arguments at entry, as the engine takes them: a piece pointer as the piece's
+    index, a request as its 12 bytes, a reply as its two (signed) bytes."""
+    def read(m, raw):
+        out = []
+        for kind, pos in arg_slots(fmt):
+            if kind == "b":
+                out.append(struct.unpack(">b", raw[pos:pos + 1])[0])
+            elif kind == "w":
+                out.append(struct.unpack(">h", raw[pos:pos + 2])[0])
+            elif kind == "l":
+                out.append(struct.unpack(">i", raw[pos:pos + 4])[0])
+            else:
+                ptr = struct.unpack(">I", raw[pos:pos + 4])[0]
+                if kind == "p":
+                    k, r = divmod(ptr - m.g(PIECES), 14)
+                    assert r == 0, f"not a piece pointer: {ptr:#x}"
+                    out.append(k)
+                elif kind == "q":
+                    out.append(list(m.uc.mem_read(ptr, 12)))
+                else:
+                    out.append([signed(b) for b in m.uc.mem_read(ptr, 2)])
+        return out
+    return read
+
+
+def read_replies(fmt):
+    """The replies at return (the bytes reply pointers point to), or None if there are none."""
+    if "r" not in fmt:
+        return None
+
+    def read(m, raw):
+        out = []
+        for kind, pos in arg_slots(fmt):
+            if kind == "r":
+                ptr = struct.unpack(">I", raw[pos:pos + 4])[0]
+                out += [signed(b) for b in m.uc.mem_read(ptr, 2)]
+        return out
+    return read
+
+
+# name: (segment, offset, argument format (see arg_slots), result kind, engine routine).
+# A routine with reply arguments returns, in the engine, its result (if it has one) and then
+# the replies, as one list.
 ROUTINES = {
     "aiPlan": (7, 0x11EA, "", None, "aiPlan"),
     "aiNewGame": (2, 0x2E3A, "", None, "aiNewGame"),
@@ -86,22 +128,44 @@ ROUTINES = {
     "wakeLightTransports": (1, 0x0850, "", None, "wakeLightTransports"),
     "aiFocus": (6, 0x5630, "", None, "aiFocus"),
     "aiTransport": (6, 0x4928, "lw", None, "aiTransport"),
+    "takesOn": (6, 0x5388, "pp", "b", "takesOn"),
+    "followOrders": (6, 0x4DEE, "qrp", None, "followOrders"),
+    "transportArrives": (6, 0x2694, "pwr", "b", "transportArrives"),
+    "hypot": (1, 0x0004, "ww", "w", "hypot"),
+    "clearLine": (1, 0x03E2, "wwwww", "b", "clearLine"),
+    "armyMove": (7, 0x0A4A, "pw", None, "armyMove"),
+    "armyAboard": (7, 0x0850, "pww", None, "armyAboard"),
+    "sendToCity": (6, 0x630C, "pb", "b", "sendToCity"),
+    "huntArmies": (6, 0x6462, "pbww", None, "huntArmies"),
+    "exploreIsland": (7, 0x0348, "pbw", "b", "exploreIsland"),
+    "fighterMove": (6, 0x2278, "pw", None, "fighterMove"),
+    "fighterTarget": (6, 0x11CC, "pw", "b", "fighterTarget"),
+    "fighterReturn": (6, 0x0F50, "p", None, "fighterReturn"),
+    "fighterSearch": (6, 0x0BB2, "p", None, "fighterSearch"),
+    "fighterStep": (6, 0x077E, "p", None, "fighterStep"),
+    "exploreAround": (6, 0x054E, "pwwb", None, "exploreAround"),
+    "fighterBase": (6, 0x027E, "p", "b", "fighterBase"),
 }
 
 
 def compare(js, names, name, spec, call, bounds):
     seg, off, fmt, result, fn = spec
-    args = words(fmt)(call["args"]) if fmt else []
+    args = call["argv"]
     call = dict(call, before=with_bounds(call["before"], bounds), after=with_bounds(call["after"], bounds))
     res, mem, _ = js.call(fn, call["before"], args)
     problems = []
+    want = []
     if result is not None:
-        want = call["result"]
-        if result == "b":
-            want = 1 if want else 0
-            res = 1 if res else 0
-        if res != want:
-            problems.append(f"result: original {want}, engine {res}")
+        want.append(1 if call["result"] and result == "b" else call["result"] if result != "b" else 0)
+    if call.get("out") is not None:
+        want += call["out"]
+        got = list(res)
+    else:
+        got = [res] if result is not None else []
+    if result == "b" and got:
+        got[0] = 1 if got[0] else 0
+    if got != want:
+        problems.append(f"result: original {want}, engine {got}")
     diffs = [d for d in diff_globals(call["after"], mem, names, limit=1000)
              if int(d.split(":")[0][2:].split()[0], 16) not in IGNORED] if call["after"] != mem else []
     problems += diffs[:12]
@@ -117,7 +181,8 @@ def run(games, days, seed, only, verbose):
     for gi in range(games):
         g = Game(seed + gi)
         auto = gi % 2 == 0
-        caps = {k: Capture(g.m, v[0], v[1], argbytes(v[2]), v[3], limit=60) for k, v in targets.items()}
+        caps = {k: Capture(g.m, v[0], v[1], argbytes(v[2]), v[3], limit=60,
+                           enter=read_args(v[2]), leave=read_replies(v[2])) for k, v in targets.items()}
         g.new_game(skill=g.rng.randint(1, 10), auto_play=auto)
         bounds = island_bounds(g.m)
         for _ in range(days):

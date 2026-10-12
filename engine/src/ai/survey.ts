@@ -3,24 +3,15 @@
  * build (CODE 8 + 0x0004, by way of CODE 1 + 0x0702).
  */
 import { Mem } from "../mem.ts";
-import { ARMY, CITY_COUNT, ISLAND_MAP, PIECE_COUNT, TRANSPORT } from "../globals.ts";
+import { ARMY, CITY_COUNT, PIECE_COUNT, TRANSPORT } from "../globals.ts";
 import { explored } from "../map.ts";
-import { ISLAND_BOUNDS, ISLAND_COUNT } from "../mapgen.ts";
+import { ISLAND_BOUNDS, ISLAND_COUNT, islandAt } from "../mapgen.ts";
 import { pieceAt, pOwner, pSpotted, pState, pType, pX, pY, setState } from "../piece.ts";
 import { cityRec } from "../units.ts";
-import { CITY_MARKS, ISLAND_BYTES, ISLAND_WORDS, islandRec, PIECES_OF } from "./data.ts";
+import { CITY_MARKS, CITY_SENT, CITY_SENT_DISTANCE, ISLAND_BYTES, ISLAND_WORDS, islandRec, PIECES_OF } from "./data.ts";
 
-/** Per city: two words the survey resets (a distance, 5000 when none is known, and another). */
-const CITY_WORD_A = -0x1cee;
-const CITY_DISTANCE = -0x1d4a;
 /** A byte set once the side has three Transports. */
 export const HAS_TRANSPORTS = -0x1bfd;
-
-/** The island number of square (x, y). */
-export function islandAt(m: Mem, x: number, y: number): number {
-  const row = y - 1;
-  return (m.b(ISLAND_MAP + (x - 1) * 30 + (row >> 1)) >> ((row & 1) << 2)) & 0x0f;
-}
 
 /** Cities on island record `r` that player 2 has seen: its own, the enemy's, neutral. */
 const ownCities = (m: Mem, r: number) => m.sb(r + 12);
@@ -51,8 +42,8 @@ export function wakeTransports(m: Mem): void {
 export function aiSurvey(m: Mem): void {
   const cities = m.sb(CITY_COUNT);
   for (let c = 0; c <= cities; c++) {
-    m.setW(CITY_WORD_A + 2 * c, 0);
-    m.setW(CITY_DISTANCE + 2 * c, 5000);
+    m.setW(CITY_SENT + 2 * c, 0);
+    m.setW(CITY_SENT_DISTANCE + 2 * c, 5000);
   }
   const transportsBefore = m.sw(PIECES_OF[TRANSPORT]);
   for (const off of PIECES_OF) m.setW(off, 0);

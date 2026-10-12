@@ -6,12 +6,12 @@ import {
   ARMY, BATTLESHIP, BOMBER, CARRIER, CITY_COUNT, DAY, DESTROYER, FIGHTER, PIECE_COUNT, SKILL, SUBMARINE, TRANSPORT, WATER,
 } from "../globals.ts";
 import { distance, terrainNear } from "../map.ts";
-import { ISLAND_CENTERS, ISLAND_COUNT } from "../mapgen.ts";
+import { ISLAND_CENTERS, ISLAND_COUNT, islandAt } from "../mapgen.ts";
 import { pCargo, pieceAt, pOwner, pState, pType, pX, pY, setCargo, setState } from "../piece.ts";
 import { cityRec, setCityOwner } from "../units.ts";
 import { BUILDING, ISLAND_BYTES, ISLAND_WORDS, islandRec, PIECES_OF } from "./data.ts";
 import { aiPlan } from "./plan.ts";
-import { aiSurvey, islandAt, wakeTransports } from "./survey.ts";
+import { aiSurvey, wakeTransports } from "./survey.ts";
 import { aiTransport } from "./transports.ts";
 
 /** Ship and aircraft shares (percent) the computer aims for, early and later in the game. */

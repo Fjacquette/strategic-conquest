@@ -28,7 +28,13 @@ import { loadGame, saveGame } from "../src/savefile.ts";
 import { aiPlan } from "../src/ai/plan.ts";
 import { aiNewGame, aiNewSide } from "../src/ai/setup.ts";
 import { aiFocus, aiIslandReview, aiNewPiece, aiProduction, wakeLightTransports } from "../src/ai/production.ts";
-import { aiTransport } from "../src/ai/transports.ts";
+import { aiTransport, transportArrives } from "../src/ai/transports.ts";
+import { clearLine, followOrders, takesOn } from "../src/ai/moves.ts";
+import { armyAboard, armyMove, exploreIsland, huntArmies, sendToCity } from "../src/ai/armies.ts";
+import { hypot } from "../src/map.ts";
+import {
+  exploreAround, fighterBase, fighterMove, fighterReturn, fighterSearch, fighterStep, fighterTarget,
+} from "../src/ai/fighters.ts";
 import { aiSurvey, wakeTransports } from "../src/ai/survey.ts";
 import { Reply, Request } from "../src/host.ts";
 import { TestHost, type Action } from "./testhost.ts";
@@ -139,6 +145,27 @@ export const registry: Record<string, Fn> = {
   wakeLightTransports: (m) => wakeLightTransports(m),
   aiFocus: (m) => aiFocus(m),
   aiTransport: (m, [_p, idx]) => aiTransport(m, idx),
+  takesOn: (m, [mover, other]) => (takesOn(m, pieceAt(other), pieceAt(mover)) ? 1 : 0),
+  followOrders: (m, [_req, _reply, idx]) => {
+    const reply = new Reply();
+    followOrders(m, idx, reply);
+    return [reply.dx, reply.dy];
+  },
+  transportArrives: (m, [_p, idx, reply]) => [transportArrives(m, idx) ? 1 : 0, ...reply],
+  hypot: (_m, [dx, dy]) => hypot(dx, dy),
+  clearLine: (m, [x1, y1, x2, y2, set]) => (clearLine(m, x1, y1, x2, y2, set) ? 1 : 0),
+  armyMove: (m, [_p, idx]) => armyMove(m, idx),
+  armyAboard: (m, [p, _set, island]) => armyAboard(m, pieceAt(p), island),
+  sendToCity: (m, [p, island]) => (sendToCity(m, pieceAt(p), island) ? 1 : 0),
+  huntArmies: (m, [p, island, types]) => huntArmies(m, pieceAt(p), island, types),
+  exploreIsland: (m, [p, island]) => (exploreIsland(m, pieceAt(p), island) ? 1 : 0),
+  fighterMove: (m, [_p, idx]) => fighterMove(m, idx),
+  fighterTarget: (m, [p, idx]) => (fighterTarget(m, pieceAt(p), idx) ? 1 : 0),
+  fighterReturn: (m, [p]) => fighterReturn(m, pieceAt(p)),
+  fighterSearch: (m, [p]) => fighterSearch(m, pieceAt(p)),
+  fighterStep: (m, [p]) => fighterStep(m, pieceAt(p)),
+  exploreAround: (m, [p, set, r]) => exploreAround(m, pieceAt(p), set, r),
+  fighterBase: (m, [p]) => fighterBase(m, pieceAt(p)),
   wakeTransports: (m) => wakeTransports(m),
   loadGame: async (m, [file, ignore], log) => {
     const host = new TestHost([], log, ignore ?? []);

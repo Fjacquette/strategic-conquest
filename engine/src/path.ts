@@ -27,7 +27,7 @@ export interface Dir {
 // Scratch globals written by the path finder.
 export const PATH_STEP_X = -0x5142; // word: last direction chosen
 export const PATH_STEP_Y = -0x5140;
-const PATH_DECIDED = -0x513b; // byte: the last detour choice was not a coin toss
+export const PATH_DECIDED = -0x513b; // byte: the last detour choice was not a coin toss
 const PATH_SIM_STEPS = -0x513a; // word: steps of the chosen simulated detour
 
 const SHIPS = 0x7c;
@@ -161,7 +161,7 @@ function simStep(m: Mem, r: Uint8Array, terrainSet: number): Dir {
  * (at most max(80, twice the distance) steps each). Returns the turning direction to use
  * as orders: 1 (clockwise) or 0 (counterclockwise).
  */
-function chooseDetour(m: Mem, terrainSet: number, piece: Uint8Array): number {
+export function chooseDetour(m: Mem, terrainSet: number, piece: Uint8Array): number {
   const orig = piece.slice(0, PIECE_SIZE);
   let sim = orig.slice();
   sim.copyWithin(4, 6, 8);

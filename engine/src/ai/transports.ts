@@ -2,14 +2,16 @@
  * The computer opponent's Transports.
  */
 import { Mem } from "../mem.ts";
-import { ARMY, LAND, PIECE_COUNT, PIECE_HASH, TRANSPORT } from "../globals.ts";
+import { ARMY, CITY_P2, LAND, PIECE_COUNT, PIECE_HASH, TRANSPORT } from "../globals.ts";
 import { inSet, onMap, terrainAt, terrainNear } from "../map.ts";
+import { ISLAND_CENTERS, islandAt } from "../mapgen.ts";
+import { wakeAllAt } from "../moveops.ts";
 import { type Dir, rotate } from "../path.ts";
 import { pCargo, pieceAt, pOwner, pState, pType, pX, pY, setCargo, setState } from "../piece.ts";
 import { countAt } from "../query.ts";
 import { qdRandom } from "../random.ts";
 import { islandRec } from "./data.ts";
-import { islandAt } from "./survey.ts";
+import { wakeLightTransports } from "./production.ts";
 
 /** Cities of either player (terrain 2, 4). */
 const PLAYER_CITIES = 0x14;
@@ -100,4 +102,37 @@ export function aiTransport(m: Mem, idx: number): void {
       return;
     }
   }
+}
+
+/** CODE 9 + 0x0004: wake player 2's Armies whose island field is `island`. */
+export function wakeIslandArmies(m: Mem, island: number): void {
+  const n = m.sw(PIECE_COUNT);
+  for (let i = 1; i <= n; i++) {
+    const q = pieceAt(i);
+    if (pOwner(m, q) === 2 && pType(m, q) === ARMY && pCargo(m, q) === island) setState(m, q, 1);
+  }
+}
+
+/**
+ * CODE 6 + 0x2694: a computer Transport `idx` under orders, beside land, whose go-to
+ * destination is the centre of the island it is beside, has arrived: if it is empty and
+ * beside land or a player 2 city it wakes the lightly loaded Transports and the island's
+ * Armies (its own state is set to loading only in a copy, which is dropped); otherwise it
+ * wakes everything at the island's centre. Returns whether it arrived (the move is then
+ * left for the next request).
+ */
+export function transportArrives(m: Mem, idx: number): boolean {
+  const p = pieceAt(idx);
+  const x = pX(m, p), y = pY(m, p);
+  if (!terrainNear(m, x, y, LAND_OR_CITY)) return false;
+  const island = pieceIsland(m, idx, m.bytes(p, 14).slice());
+  const cx = m.sb(ISLAND_CENTERS + 2 * island + 1), cy = m.sb(ISLAND_CENTERS + 2 * island);
+  if (cx !== m.sb(p + 3) || cy !== m.sb(p + 2)) return false;
+  if (pCargo(m, p) === 0 && terrainNear(m, x, y, (1 << LAND) | (1 << CITY_P2))) {
+    wakeLightTransports(m);
+    wakeIslandArmies(m, island);
+  } else {
+    wakeAllAt(m, cx, cy);
+  }
+  return true;
 }

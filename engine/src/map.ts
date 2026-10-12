@@ -54,6 +54,41 @@ export function distance(dx: number, dy: number): number {
   return Math.max(Math.abs(dx), Math.abs(dy));
 }
 
+/**
+ * CODE 1 + 0x0004: the length of an offset, approximately (to within a square or so):
+ * twice the longer side plus a series in the squared ratio of the sides, all in 16-bit
+ * unsigned fixed point, halved.
+ */
+export function hypot(dx: number, dy: number): number {
+  let lo = Math.abs(dx) & 0xffff, hi = Math.abs(dy) & 0xffff;
+  if (lo >= hi) [lo, hi] = [hi, lo];
+  if (hi === 0) return 0;
+  if (lo === 0) return hi;
+  if (lo === hi) return ((hi * 0x5a82) >>> 14) & 0xffff;
+  const q = Math.floor(((lo << 8) & 0xffff) / hi) & 0xffff;
+  const t = (q * q) >>> 8;
+  const t2 = (t << 1) & 0xffff;
+  const next = (term: number) => ((term * t2) >>> 8) & 0xffff;
+  let term = ((t * hi) & 0xffff) >>> 8;
+  let sum = (hi << 1) + term;
+  const steps: ((v: number) => number)[] = [
+    (v) => -(v >>> 3),
+    (v) => v >>> 2,
+    (v) => -(((v * 5) & 0xffff) >>> 4),
+    (v) => Math.floor(((v >>> 1) * 7) / 10),
+    (v) => -(((v * 3) & 0xffff) >>> 3),
+    (v) => Math.floor(((v >>> 1) * 11) / 14),
+    (v) => -(((v * 13) & 0xffff) >>> 5),
+  ];
+  for (const step of steps) {
+    if (term <= 1) break;
+    const signed = step(next(term));
+    term = Math.abs(signed);
+    sum += signed;
+  }
+  return (sum & 0xffff) >>> 1;
+}
+
 /** CODE 4 + 0x2960: inside the playable area (the edge ring excluded). */
 export function onMap(x: number, y: number): boolean {
   return x > 1 && x < 80 && y > 1 && y < 60;
