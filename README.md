@@ -44,8 +44,9 @@ emulator on thousands of random cases (differential tests in `tools/emu/`).
 | `tools/analysis/` | Resource-fork, disassembly, cross-reference and comparison scripts |
 | `tools/save/sc3save.py` | Save-file reader: text dump and map rendering |
 | `engine/` | The game engine in TypeScript: state layout, map generation and a new game, the day loop, movement, players' orders, combat, units, path finding, saved games (`engine/src`) and the computer opponent (`engine/src/ai`); bridge used by the tests (`engine/test`) |
-| `web/` | The browser game, single player against the computer, drawn and sounding like the original. Its artwork, sounds and words come from the owner's copy: run `tools/assets/extract_assets.py` first; `npm run build` then writes one self-contained page to `web/dist/play.html`, for the owner's own use |
+| `web/` | The browser game, against the computer or another player over the network, drawn and sounding like the original. Its artwork, sounds and words come from the owner's copy: run `tools/assets/extract_assets.py` first; `npm run build` then writes one self-contained page to `web/dist/play.html`, for the owner's own use |
 | `tools/emu/` | Harness that runs the original routines on an emulated 68040, and differential tests of the engine against them |
+| `tools/web/` | Tests of the browser game in headless Chromium: the connection and network games |
 | `tools/extract.sh` | Unpacks the game archive into `build/sc301.rsrc` |
 | `emulator/` | Headless Basilisk II setup and control scripts |
 | `saves/3.01/` | Saved games produced in the emulator, with descriptions |
@@ -79,6 +80,8 @@ python3 -I tools/emu/test_savefile.py 20          # saving and loading games
 python3 -I tools/emu/test_ai.py 4 100             # the computer opponent's routines, on real games
 python3 -I tools/emu/test_aigame.py 2 100         # whole games played by the computer, day by day
 python3 -I tools/emu/test_battle.py               # also test_hash, test_tools, test_path, test_units
+python3 -I tools/web/test_link.py                 # the players' direct connection, in headless Chromium
+python3 -I tools/web/test_netgame.py 60           # network games between two pages (needs web/dist/play.html)
 python3 -I tools/analysis/codeinfo.py build/sc301.rsrc
 python3 -I tools/save/sc3save.py dump saves/3.01/s04-day58-autoplay.sav
 python3 -I tools/save/sc3save.py render saves/3.01/s04-day58-autoplay.sav build/day58.png --player 1

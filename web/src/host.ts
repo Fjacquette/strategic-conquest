@@ -103,20 +103,26 @@ export class BrowserHost implements Host {
       await this.ui.notice(chosen.problem);
       return;
     }
+    if (chosen.network) {
+      await this.ui.notice("A network game goes on from the start: choose File > Resume Game while the game setup is shown.");
+      return;
+    }
     const d = this.words.dialog(304);
     if (await this.ui.ask(d.text, d.buttons[0] ?? "OK", d.buttons[1] ?? "Cancel")) this.pending.resume = chosen.bytes;
   }
 
   /**
-   * A saved game the player picks (while handling a click): its bytes, why it cannot be
-   * played here, or null if none was picked.
+   * A saved game the player picks (while handling a click): its bytes and whether it is a
+   * network game, why it cannot be played here, or null if none was picked. Games against
+   * the computer and network games (saved by the Master) can be played; games of two players
+   * at one computer cannot.
    */
-  async chooseSavedGame(): Promise<{ bytes: Uint8Array } | { problem: string } | null> {
+  async chooseSavedGame(): Promise<{ bytes: Uint8Array; network: boolean } | { problem: string } | null> {
     const bytes = await this.file.chooseOpen();
     if (!bytes) return null;
-    if (bytes.length < SAVE_SIZE) return { problem: "That file is not a Strategic Conquest saved game." };
-    if (bytes[4] !== 0) return { problem: "That saved game is a two-player game. Only games against the computer can be resumed so far." };
-    return { bytes };
+    if (bytes.length < SAVE_SIZE || bytes[4] > 2) return { problem: "That file is not a Strategic Conquest saved game." };
+    if (bytes[4] === 1) return { problem: "That saved game is for two players at one computer, which this version does not play." };
+    return { bytes, network: bytes[4] === 2 };
   }
 
   /** CODE 1 + 0x1A18: the File menu actions deferred to the start of the day. */

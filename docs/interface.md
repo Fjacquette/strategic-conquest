@@ -87,6 +87,9 @@ map, or over the right half when the square is in the left half.
 Options > Send Message and Options > Battle Summary are disabled in single player
 (`CODE 12 + 0x00DA`); both belong to the two-player game.
 
+In the browser's network game, Auto Play is not offered, and only the Master saves; File >
+Resume Game is offered at the setup screen only (see [network.md](network.md)).
+
 ## Saving and resuming
 
 File > Save and Save As (`CODE 16 + 0x0158`) only set a flag: the alert says the game will

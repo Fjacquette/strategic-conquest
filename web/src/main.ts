@@ -1,13 +1,14 @@
 /**
- * A game against the computer: the setup dialog, a new game, then day after day. The menus
- * work as the original's: Moves commands apply to the piece being moved, Displays show the
- * city list and the world map, Options switch the sound.
+ * A game against the computer or over the network: the setup dialog, a new game, then day
+ * after day. The menus work as the original's: Moves commands apply to the piece being moved,
+ * Displays show the city list and the world map, Options switch the sound.
  */
 import { GLOBALS_SIZE, Mem } from "../../engine/src/mem.ts";
 import {
   AUTO_PLAY, AUTO_PLAY_REQUESTED, AUTOSAVE_OFF, CITY_COUNT, COMPUTER_FLAG, DAY, GAME_MODE, GAME_SEED, LOCAL_PLAYER, NET_TURN, SKILL, WATER,
 } from "../../engine/src/globals.ts";
 import { DayLoop, runDay, setUpControllers } from "../../engine/src/day.ts";
+import { type Host } from "../../engine/src/host.ts";
 import { initGlobals } from "../../engine/src/launch.ts";
 import { playerMap, terrainNear } from "../../engine/src/map.ts";
 import { generateMap } from "../../engine/src/mapgen.ts";
@@ -18,7 +19,9 @@ import { cityRec } from "../../engine/src/units.ts";
 import { assets } from "./assets.ts";
 import { BrowserHost } from "./host.ts";
 import { Input } from "./input.ts";
+import { Link } from "./link.ts";
 import { MapView, RULER_LEFT, RULER_TOP } from "./mapview.ts";
+import { Channel, greet, LostConnection, MasterHost, runSlave } from "./net.ts";
 import { Sound } from "./sound.ts";
 import { Words } from "./text.ts";
 import { type CityRow, UI } from "./ui.ts";
@@ -64,6 +67,8 @@ function start(): void {
   input.attach(view, () => ui.modal);
   const sound = new Sound(A.sounds);
   const host = new BrowserHost(ui, view, input, words, sound);
+  // The game state, for the browser's console and for tests.
+  (window as unknown as { scState: () => Uint8Array | null }).scState = () => host.m?.u8 ?? null;
   for (const type of ["pointerdown", "click", "touchend", "keydown"]) {
     window.addEventListener(type, () => sound.unlock(), { capture: true });
   }
@@ -91,7 +96,25 @@ function start(): void {
   // The game starts from the setup dialog, or from a saved game chosen while it is shown.
   let begin: (choice: StartChoice) => void = () => {};
   const started = new Promise<StartChoice>((resolve) => { begin = resolve; });
-  const setup = () => { void ui.setup().then((skill) => begin({ skill, saved: null })); };
+  const setup = (): void => {
+    void ui.setup().then(async (s) => {
+      if (s.mode === "single") {
+        begin({ skill: s.skill, saved: null, net: null });
+        return;
+      }
+      try {
+        const channel = s.mode === "invite" ? await invite(ui) : await join(ui);
+        if (!channel) {
+          setup();
+          return;
+        }
+        begin({ skill: s.mode === "invite" ? s.skill : 0, saved: null, net: { master: s.mode === "invite", channel } });
+      } catch (e) {
+        await ui.notice((e as Error).message);
+        setup();
+      }
+    });
+  };
 
   const commands: Record<string, () => void | Promise<void>> = {
     new: async () => {
@@ -104,10 +127,21 @@ function start(): void {
       }
       const chosen = await host.chooseSavedGame();
       if (!chosen) return;
-      if ("bytes" in chosen) {
-        begin({ skill: 0, saved: chosen.bytes });
-      } else {
+      if ("problem" in chosen) {
         await ui.notice(chosen.problem);
+        setup();
+      } else if (!chosen.network) {
+        begin({ skill: 0, saved: chosen.bytes, net: null });
+      } else if (await ui.ask("This saved game is a network game. Invite the other player to go on with it?", "Invite", "Cancel")) {
+        try {
+          const channel = await invite(ui);
+          if (channel) begin({ skill: 0, saved: chosen.bytes, net: { master: true, channel } });
+          else setup();
+        } catch (e) {
+          await ui.notice((e as Error).message);
+          setup();
+        }
+      } else {
         setup();
       }
     },
@@ -202,45 +236,108 @@ function preview(view: MapView): void {
   view.draw(m);
 }
 
-/** How a game starts: a new game at a skill level, or a saved game. */
+/**
+ * How a game starts: a new game at a skill level, or a saved game; in a network game, this
+ * page's role (the Master, player 1, runs the game) and its connection.
+ */
 interface StartChoice {
   skill: number;
   saved: Uint8Array | null;
+  net: { master: boolean; channel: Channel } | null;
+}
+
+/** The inviting player's side of the connection; null if cancelled. */
+async function invite(ui: UI): Promise<Channel | null> {
+  ui.wait("Making your invitation…");
+  const { link, code } = await Link.invite();
+  const connected = await ui.invite(code, async (reply) => {
+    await link.accept(reply);
+    await link.ready.catch(() => {
+      throw new Error("The two games could not connect. Cancel, then try again with a new invitation.");
+    });
+  });
+  if (!connected) {
+    link.close();
+    return null;
+  }
+  const channel = new Channel(link);
+  await greet(channel);
+  return channel;
+}
+
+/** The joining player's side of the connection; null if cancelled. */
+async function join(ui: UI): Promise<Channel | null> {
+  const joined: { link: Link | null } = { link: null };
+  const connected = await ui.join(async (code) => {
+    joined.link?.close();
+    const { link, reply } = await Link.join(code);
+    joined.link = link;
+    const ready = link.ready.catch(() => {
+      throw new Error("The two games could not connect. Ask the other player for a new invitation.");
+    });
+    return { reply, connected: ready };
+  });
+  if (!connected || !joined.link) {
+    joined.link?.close();
+    return null;
+  }
+  const channel = new Channel(joined.link);
+  await greet(channel);
+  return channel;
 }
 
 async function main(ui: UI, view: MapView, host: BrowserHost, words: Words, started: Promise<StartChoice>): Promise<void> {
   const start = await started;
   ui.dismiss();
   view.revealAll = false;
-  ui.enable("save", true);
-  ui.enable("saveas", true);
-  ui.enable("autoplay", true);
+  const net = start.net;
+  // Only the Master runs the game, so only it saves; network games are not resumed yet.
+  ui.enable("save", !net || net.master);
+  ui.enable("saveas", !net || net.master);
+  ui.enable("autoplay", !net);
+  ui.enable("resume", !net);
 
   const m = new Mem(new Uint8Array(GLOBALS_SIZE));
   initGlobals(m);
   host.m = m;
+  try {
+    if (net && !net.master) {
+      m.setB(LOCAL_PLAYER, 2);
+      view.viewer = 2;
+      await runSlave(net.channel, host, m);
+    } else {
+      await play(ui, host, words, m, start, net ? new MasterHost(host, net.channel) : host);
+    }
+  } catch (e) {
+    if (!(e instanceof LostConnection)) throw e;
+    await ui.notice(e.message);
+  }
+}
+
+/** The game on this page: a new one or a saved one, then day after day until it ends. */
+async function play(ui: UI, host: BrowserHost, words: Words, m: Mem, start: StartChoice, game: Host): Promise<void> {
   if (start.saved) {
     // As when the original is opened with a saved game, the day loop then counts the day
     // up before the first turn (quirk Q15).
     await host.resume(m, start.saved);
   } else {
-    m.setB(GAME_MODE, 0);
+    m.setB(GAME_MODE, start.net ? 2 : 0);
     m.setB(SKILL, start.skill);
     m.setB(playerMap(1) + COMPUTER_FLAG, 0);
-    m.setB(playerMap(2) + COMPUTER_FLAG, 1);
+    m.setB(playerMap(2) + COMPUTER_FLAG, start.net ? 0 : 1);
     m.setB(AUTO_PLAY, 0);
     m.setB(LOCAL_PLAYER, 1);
     m.setB(NET_TURN, 1);
     m.setW(DAY, 1);
-    await newGame(m, host);
+    await newGame(m, game);
     m.setB(AUTOSAVE_OFF, 1);
     setUpControllers(m);
   }
 
   const loop = new DayLoop();
   for (;;) {
-    const end = await runDay(m, host, loop);
-    view.draw(m);
+    const end = await runDay(m, game, loop);
+    host.redraw(m);
     if (end.p1Defeated) {
       await ui.notice(words.str(1040));
       return;

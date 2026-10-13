@@ -42,6 +42,9 @@ export interface PieceCard {
   rows: PieceRow[];
 }
 
+/** How a game starts: against the computer, or a network game this page invites to or joins. */
+export type Setup = { mode: "single" | "invite"; skill: number } | { mode: "join" };
+
 /** One row of the city list. */
 export interface CityRow {
   city: number;
@@ -219,29 +222,127 @@ export class UI {
     return b;
   }
 
-  /** "Choose a Game Setup": resolves with the skill level. */
-  setup(): Promise<number> {
+  /**
+   * "Choose a Game Setup": a game against the computer, or a network game in which this page
+   * invites the other player (and plays player 1) or joins (player 2). The skill level
+   * shapes the world the inviting player's game makes.
+   */
+  setup(): Promise<Setup> {
     return new Promise((resolve) => {
       this.open((d) => {
         // The menus stay usable, for File > Resume Game.
         this.overlay.dataset.menus = "";
         d.classList.value = "dialog setup";
         const modes = el("div", { class: "modes", role: "radiogroup" });
-        const options: [string, boolean][] = [["Single Player Game", true], ["Network Game (coming)", false]];
-        options.forEach(([label, enabled], i) => {
-          const id = `mode-${i}`;
-          const r = el("input", { type: "radio", name: "mode", id });
-          r.checked = i === 0;
-          r.disabled = !enabled;
-          modes.append(el("div", {}, r, el("label", { for: id }, label)));
-        });
         const out = el("output", { id: "skill-out" }, "skill level 1");
         const range = el("input", { type: "range", id: "skill", min: "1", max: "15", value: "1", "aria-label": "Skill level" });
         range.addEventListener("input", () => { out.textContent = `skill level ${range.value}`; });
+        const options: [Setup["mode"], string][] = [
+          ["single", "Single Player Game"], ["invite", "Network Game: Invite"], ["join", "Network Game: Join"],
+        ];
+        let mode: Setup["mode"] = "single";
+        options.forEach(([value, label], i) => {
+          const id = `mode-${i}`;
+          const r = el("input", { type: "radio", name: "mode", id });
+          r.checked = i === 0;
+          r.addEventListener("change", () => {
+            mode = value;
+            range.disabled = value === "join";
+          });
+          modes.append(el("div", {}, r, el("label", { for: id }, label)));
+        });
         d.append(
           el("p", {}, "Choose a Game Setup:"), modes,
-          this.button("Continue", true, () => { this.close(); resolve(Number(range.value)); }),
+          this.button("Continue", true, () => {
+            this.close();
+            resolve(mode === "join" ? { mode } : { mode, skill: Number(range.value) });
+          }),
           el("div", { class: "skill" }, out, range),
+        );
+      });
+    });
+  }
+
+  /** A message while something takes a moment; the next dialog replaces it. */
+  wait(text: string): void {
+    this.open((d) => {
+      d.classList.value = "dialog notice";
+      d.append(el("p", {}, text));
+    });
+  }
+
+  /** A code to pass to the other player, with a button that copies it. */
+  private codeBox(code: string): HTMLDivElement {
+    const box = el("textarea", { class: "code", readonly: "", rows: "5", spellcheck: "false", "aria-label": "Code" });
+    box.value = code;
+    const copy = this.button("Copy", false, () => {
+      box.select();
+      navigator.clipboard?.writeText(code).then(
+        () => { copy.textContent = "Copied"; },
+        () => { copy.textContent = "Press ⌘C"; },
+      );
+    });
+    return el("div", { class: "codebox" }, box, copy);
+  }
+
+  /**
+   * The inviting player's connection: the invitation code to send, and a box for the reply
+   * code. `connect` tries a reply code, rejecting with the reason it failed. Resolves true
+   * once connected, false if cancelled.
+   */
+  invite(code: string, connect: (reply: string) => Promise<void>): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.open((d) => {
+        d.classList.value = "dialog notice network";
+        const reply = el("textarea", { class: "code", rows: "5", spellcheck: "false", "aria-label": "Reply code" });
+        const status = el("p", { class: "status", role: "status" });
+        const go = this.button("Connect", true, () => {
+          go.disabled = true;
+          status.textContent = "Connecting…";
+          connect(reply.value).then(
+            () => { this.close(); resolve(true); },
+            (e: Error) => { status.textContent = e.message; go.disabled = false; },
+          );
+        });
+        d.append(
+          el("p", {}, "Send this invitation code to the other player:"), this.codeBox(code),
+          el("p", {}, "Then paste the reply code you get back:"), reply, status,
+          el("div", { class: "buttons" }, this.button("Cancel", false, () => { this.close(); resolve(false); }), go),
+        );
+      });
+    });
+  }
+
+  /**
+   * The joining player's connection: a box for the invitation code; `answer` turns it into
+   * the reply code to send back, and a promise that resolves once connected (or rejects with
+   * the reason). Resolves true once connected, false if cancelled.
+   */
+  join(answer: (code: string) => Promise<{ reply: string; connected: Promise<void> }>): Promise<boolean> {
+    return new Promise((resolve) => {
+      const cancel = () => this.button("Cancel", false, () => { this.close(); resolve(false); });
+      this.open((d) => {
+        d.classList.value = "dialog notice network";
+        const code = el("textarea", { class: "code", rows: "5", spellcheck: "false", "aria-label": "Invitation code" });
+        const status = el("p", { class: "status", role: "status" });
+        const go = this.button("Reply", true, () => {
+          go.disabled = true;
+          status.textContent = "Making your reply…";
+          answer(code.value).then(({ reply, connected }) => {
+            status.textContent = "Waiting for the other player to connect…";
+            d.replaceChildren(
+              el("p", {}, "Send this reply code to the other player:"), this.codeBox(reply), status,
+              el("div", { class: "buttons" }, cancel()),
+            );
+            connected.then(
+              () => { this.close(); resolve(true); },
+              (e: Error) => { status.textContent = e.message; },
+            );
+          }, (e: Error) => { status.textContent = e.message; go.disabled = false; });
+        });
+        d.append(
+          el("p", {}, "Paste the invitation code you were sent:"), code, status,
+          el("div", { class: "buttons" }, cancel(), go),
         );
       });
     });
