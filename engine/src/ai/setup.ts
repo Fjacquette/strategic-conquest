@@ -2,18 +2,12 @@
  * The computer opponent's start-of-game set-up (CODE 2, EMPINIT).
  */
 import { Mem } from "../mem.ts";
-import { CITY_COUNT, ISLAND_MAP } from "../globals.ts";
-import { ISLAND_CENTERS, ISLAND_COUNT } from "../mapgen.ts";
+import { CITY_COUNT } from "../globals.ts";
+import { ISLAND_CENTERS, ISLAND_COUNT, islandAt } from "../mapgen.ts";
 import {
   BUILDING, BUILDING_TOTAL, CITY_MARKS, ISLAND_SIZE, ISLANDS, islandRec, ISLAND_BYTES, ISLAND_WORDS, OTHER_ISLANDS,
   SIDE_WORDS,
 } from "./data.ts";
-
-/** The island number of square (x, y) (4 bits a square, column-major). */
-function islandAt(m: Mem, x: number, y: number): number {
-  const row = y - 1;
-  return (m.b(ISLAND_MAP + (x - 1) * 30 + (row >> 1)) >> ((row & 1) << 2)) & 0x0f;
-}
 
 /**
  * CODE 2 + 0x2E3A: at the start of a game against the computer, the other side's data

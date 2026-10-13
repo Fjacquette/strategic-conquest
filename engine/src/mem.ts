@@ -10,36 +10,48 @@
 /** Bytes of globals below A5. */
 export const GLOBALS_SIZE = 0x55c4;
 
+/**
+ * Scratch piece records above A5 (offsets 0, 14, ...), standing for the record copies the
+ * original keeps on its stack and passes to routines that take a record pointer. They are
+ * not part of the globals image.
+ */
+export const SCRATCH_RECORDS = 4;
+const SCRATCH_SIZE = SCRATCH_RECORDS * 14;
+
 export class Mem {
+  /** The globals image (the scratch records follow it in the same buffer). */
   readonly u8: Uint8Array;
+  private readonly all: Uint8Array;
 
   constructor(raw?: Uint8Array) {
     if (raw && raw.length !== GLOBALS_SIZE) {
       throw new Error(`globals image must be ${GLOBALS_SIZE} bytes, got ${raw.length}`);
     }
-    this.u8 = raw ? raw : new Uint8Array(GLOBALS_SIZE);
+    this.all = new Uint8Array(GLOBALS_SIZE + SCRATCH_SIZE);
+    if (raw) this.all.set(raw);
+    this.u8 = this.all.subarray(0, GLOBALS_SIZE);
   }
 
   private at(off: number): number {
     const i = off + GLOBALS_SIZE;
-    if (i < 0 || i >= GLOBALS_SIZE) throw new RangeError(`global ${off} out of range`);
+    if (i < 0 || i >= GLOBALS_SIZE + SCRATCH_SIZE) throw new RangeError(`global ${off} out of range`);
     return i;
   }
 
   /** Unsigned byte. */
   b(off: number): number {
-    return this.u8[this.at(off)];
+    return this.all[this.at(off)];
   }
 
   /** Signed byte. */
   sb(off: number): number {
-    return (this.u8[this.at(off)] << 24) >> 24;
+    return (this.all[this.at(off)] << 24) >> 24;
   }
 
   /** Unsigned big-endian word. */
   w(off: number): number {
     const i = this.at(off);
-    return (this.u8[i] << 8) | this.u8[i + 1];
+    return (this.all[i] << 8) | this.all[i + 1];
   }
 
   /** Signed big-endian word. */
@@ -50,37 +62,42 @@ export class Mem {
   /** Unsigned big-endian long. */
   l(off: number): number {
     const i = this.at(off);
-    return ((this.u8[i] << 24) | (this.u8[i + 1] << 16) | (this.u8[i + 2] << 8) | this.u8[i + 3]) >>> 0;
+    return ((this.all[i] << 24) | (this.all[i + 1] << 16) | (this.all[i + 2] << 8) | this.all[i + 3]) >>> 0;
   }
 
   setB(off: number, v: number): void {
-    this.u8[this.at(off)] = v & 0xff;
+    this.all[this.at(off)] = v & 0xff;
   }
 
   setW(off: number, v: number): void {
     const i = this.at(off);
-    this.u8[i] = (v >> 8) & 0xff;
-    this.u8[i + 1] = v & 0xff;
+    this.all[i] = (v >> 8) & 0xff;
+    this.all[i + 1] = v & 0xff;
   }
 
   setL(off: number, v: number): void {
     const i = this.at(off);
-    this.u8[i] = (v >>> 24) & 0xff;
-    this.u8[i + 1] = (v >>> 16) & 0xff;
-    this.u8[i + 2] = (v >>> 8) & 0xff;
-    this.u8[i + 3] = v & 0xff;
+    this.all[i] = (v >>> 24) & 0xff;
+    this.all[i + 1] = (v >>> 16) & 0xff;
+    this.all[i + 2] = (v >>> 8) & 0xff;
+    this.all[i + 3] = v & 0xff;
   }
 
   bytes(off: number, size: number): Uint8Array {
     const i = this.at(off);
-    return this.u8.subarray(i, i + size);
+    return this.all.subarray(i, i + size);
   }
 
   /** Copy `size` bytes from `from` to `to`. */
   copy(to: number, from: number, size: number): void {
     const i = this.at(from);
-    this.u8.copyWithin(this.at(to), i, i + size);
+    this.all.copyWithin(this.at(to), i, i + size);
   }
+}
+
+/** Scratch record `k` (0 to SCRATCH_RECORDS - 1). */
+export function scratchRecord(k: number): number {
+  return k * 14;
 }
 
 /** 16-bit two's-complement value. */

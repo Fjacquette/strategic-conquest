@@ -60,7 +60,8 @@ def signed(b):
 def arg_slots(fmt):
     """(kind, offset in the argument bytes) of each Pascal argument, in declaration order:
     the last declared is nearest the stack pointer. Kinds: 'b' byte, 'w' word, 'l' long,
-    'p' pointer to a piece, 'q' pointer to a request record, 'r' pointer to a reply."""
+    'p' pointer to a piece record, 'q' pointer to a request record, 'r' pointer to a reply,
+    'v' pointer to a byte the routine sets."""
     slots, pos = [], 0
     for kind in reversed(fmt):
         slots.append((kind, pos))
@@ -74,7 +75,8 @@ def argbytes(fmt):
 
 def read_args(fmt):
     """The arguments at entry, as the engine takes them: a piece pointer as the piece's
-    index, a request as its 12 bytes, a reply as its two (signed) bytes."""
+    index (or, for a record copy on the stack, {"rec": its 14 bytes}), a request as its 12
+    bytes, a reply as its two (signed) bytes, a byte variable as its (signed) value."""
     def read(m, raw):
         out = []
         for kind, pos in arg_slots(fmt):
@@ -88,32 +90,38 @@ def read_args(fmt):
                 ptr = struct.unpack(">I", raw[pos:pos + 4])[0]
                 if kind == "p":
                     k, r = divmod(ptr - m.g(PIECES), 14)
-                    assert r == 0, f"not a piece pointer: {ptr:#x}"
-                    out.append(k)
+                    if r == 0 and 0 <= k <= 450:
+                        out.append(k)
+                    else:
+                        out.append({"rec": list(m.uc.mem_read(ptr, 14))})
                 elif kind == "q":
                     out.append(list(m.uc.mem_read(ptr, 12)))
-                else:
+                elif kind == "r":
                     out.append([signed(b) for b in m.uc.mem_read(ptr, 2)])
+                else:
+                    out.append(signed(m.uc.mem_read(ptr, 1)[0]))
         return out
     return read
 
 
 def read_replies(fmt):
-    """The replies at return (the bytes reply pointers point to), or None if there are none."""
-    if "r" not in fmt:
+    """The outputs at return (the bytes reply and byte-variable pointers point to), or None
+    if there are none."""
+    if "r" not in fmt and "v" not in fmt:
         return None
 
     def read(m, raw):
         out = []
         for kind, pos in arg_slots(fmt):
-            if kind == "r":
+            if kind in "rv":
                 ptr = struct.unpack(">I", raw[pos:pos + 4])[0]
-                out += [signed(b) for b in m.uc.mem_read(ptr, 2)]
+                out += [signed(b) for b in m.uc.mem_read(ptr, 2 if kind == "r" else 1)]
         return out
     return read
 
 
-# name: (segment, offset, argument format (see arg_slots), result kind, engine routine).
+# name: (segment, offset, argument format (see arg_slots), result kind ("b" boolean, "B"
+# signed byte, "w" or "l"), engine routine).
 # A routine with reply arguments returns, in the engine, its result (if it has one) and then
 # the replies, as one list.
 ROUTINES = {
@@ -145,6 +153,21 @@ ROUTINES = {
     "fighterStep": (6, 0x077E, "p", None, "fighterStep"),
     "exploreAround": (6, 0x054E, "pwwb", None, "exploreAround"),
     "fighterBase": (6, 0x027E, "p", "b", "fighterBase"),
+    "evade": (6, 0x597A, "pbvvwwb", None, "evade"),
+    "shipGoTo": (6, 0x2E22, "pww", None, "shipGoTo"),
+    "nearestPort": (6, 0x33A2, "p", "w", "nearestPort"),
+    "randomSeaTarget": (6, 0x34A4, "p", None, "randomSeaTarget"),
+    "shipMove": (6, 0x35D0, "pw", None, "shipMove"),
+    "islandForArmies": (6, 0x2D64, "ww", "B", "islandForArmies"),
+    "landCount": (6, 0x3E3A, "www", "w", "landCount"),
+    "bestLanding": (6, 0x3EA2, "wwwvv", None, "bestLanding"),
+    "nearestIsland": (6, 0x403C, "wwl", "w", "nearestIsland"),
+    "transportSail": (6, 0x279E, "pw", None, "transportSail"),
+    "transportMove": (6, 0x40B6, "pw", None, "transportMove"),
+    "wakeOtherBombers": (6, 0x1D0A, "w", None, "wakeOtherBombers"),
+    "bomberTarget": (6, 0x146C, "pw", None, "bomberTarget"),
+    "bomberMove": (6, 0x1D70, "pqw", None, "bomberMove"),
+    "aiMoveChooser": (6, 0x5102, "qr", "b", "aiMoveChooser"),
 }
 
 
@@ -155,8 +178,12 @@ def compare(js, names, name, spec, call, bounds):
     res, mem, _ = js.call(fn, call["before"], args)
     problems = []
     want = []
-    if result is not None:
-        want.append(1 if call["result"] and result == "b" else call["result"] if result != "b" else 0)
+    if result == "b":
+        want.append(1 if call["result"] else 0)
+    elif result == "B":
+        want.append(signed(call["result"]))
+    elif result is not None:
+        want.append(call["result"])
     if call.get("out") is not None:
         want += call["out"]
         got = list(res)

@@ -20,6 +20,7 @@ after) to compare the engine's versions on realistic states: see Capture.
 """
 import os
 import random
+import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -36,18 +37,83 @@ from unicorn.m68k_const import UC_M68K_REG_A7  # noqa: E402
 GAME_MODE, SKILL, AUTO_PLAY, ISLAND_POLYS = -0x1E71, -0x2CE6, -0x120C, -0x1E36
 LOCAL_PLAYER, NET_TURN, DAY = -0x2D0A, -0x1C07, -0x2D08
 AUTO_PLAY_REQUESTED, PLAYER_MAPS, PLAYER_MAP_SIZE, COMPUTER_FLAG = -0x120D, -0x2CD8, 642, 0x280
+CITIES, CITY_COUNT, TERRAIN, OWN_CITY_CODE = -0x385E, -0x1E4F, -0x27D2, -0x1284
 # The computer opponent's routines the test recorders stub; here they run.
 LIVE = {(5, 0x5CBA), (7, 0x11EA), (1, 0x0626), (2, 0x2E3A), (2, 0x24DE)}
+PRODUCTION_DAYS = [4, 6, 8, 10, 14, 10, 20]      # Army .. Battleship; Bombers depend on the day
+SHIP_TYPES = range(2, 7)
+
+
+def terrain_at(m, x, y):
+    row = y - 1
+    return (m.r8(m.g(TERRAIN + (x - 1) * 30 + (row >> 1))) >> ((row & 1) << 2)) & 0x0F
+
+
+def set_terrain(m, x, y, v):
+    row = y - 1
+    a, shift = m.g(TERRAIN + (x - 1) * 30 + (row >> 1)), (row & 1) << 2
+    m.w8(a, (m.r8(a) & ~(0x0F << shift)) | ((v & 0x0F) << shift))
+
+
+def signed8(v):
+    return v - 256 if v > 127 else v
+
+
+def production_days(m, ptype):
+    """CODE 1 + 0x021C, as engine/src/units.ts productionDays."""
+    if ptype == 7:
+        days = (struct.unpack(">h", m.read_global(DAY, 2))[0] // 70) * 5 + 20
+    else:
+        days = PRODUCTION_DAYS[ptype] if 0 <= ptype < 7 else 0
+    return days // 2 if m.r8(m.g(GAME_MODE)) in (1, 2, 3) else days
+
+
+def set_city_owner(m, ptype, city, owner):
+    """CODE 1 + 0x02B6, as engine/src/units.ts setCityOwner."""
+    a = m.g(CITIES + 10 * city)
+    rec = bytearray(m.uc.mem_read(a, 10))
+    if signed8(rec[4]) != owner or signed8(rec[8]) != ptype:
+        rec[5] = production_days(m, ptype) & 0xFF
+    if signed8(rec[4]) != owner:
+        rec[2:4] = rec[6:8]
+        rec[0:2] = rec[6:8]
+    rec[4], rec[8] = owner, ptype
+    m.uc.mem_write(a, bytes(rec))
+    set_terrain(m, signed8(rec[7]), signed8(rec[6]), m.r8(m.g(OWN_CITY_CODE + owner)))
+
+
+def choose_city_production(m, req):
+    """What the production dialog does to the city of a human player's production request
+    (the player's starting city, or one just captured), as engine/test/testhost.ts does in
+    whole games: the city becomes the player's and builds the type in the request, or Armies
+    if that is a ship and the city is not next to water."""
+    x, y, player, ptype = signed8(m.r8(req + 5)), signed8(m.r8(req + 4)), m.r8(req + 1), m.r8(req + 2)
+    n = m.r8(m.g(CITY_COUNT))
+    city = next((i for i in range(1, n + 1)
+                 if m.uc.mem_read(m.g(CITIES + 10 * i + 6), 2) == bytes([y & 0xFF, x & 0xFF])), 0)
+    coastal = any(terrain_at(m, cx, cy) == 0 for cx in (x - 1, x, x + 1) for cy in (y - 1, y, y + 1))
+    if ptype in SHIP_TYPES and not coastal:
+        ptype = 0
+    set_city_owner(m, 0, city, player)
+    set_city_owner(m, ptype, city, player)
 
 
 class GameRecorder(DayRecorder, NewGameRecorder):
     """The day loop's and the new game's stubs, without those of the computer opponent;
-    the human controller is stubbed instead of ControllerRequest."""
+    the human controller is stubbed instead of ControllerRequest. A human player's
+    production request gives the player the city, as the production dialog does
+    (choose_city_production)."""
 
     def __init__(self, d):
         self.stubbed = set()
         super().__init__(d)
         self._stub(5, 0x51FE, 12, self.on_request)
+
+    def on_request(self, sp):
+        super().on_request(sp)
+        req = self.m.r32(sp + 12)
+        if self.m.r8(req) == 6:
+            choose_city_production(self.m, req)
 
     def _stub(self, seg, off, pop, fn):
         # Both recorders stub some of the same routines; a routine is stubbed once.
@@ -58,10 +124,10 @@ class GameRecorder(DayRecorder, NewGameRecorder):
 
 class Capture:
     """Records calls of routine (seg, off): the globals and `argbytes` bytes of arguments
-    at entry, and at return the globals and the function result (`result`: None, "b", "w"
-    or "l", the size of the slot above the arguments). At most `limit` calls are kept,
-    spread over the whole game: when the list fills, every other call is dropped and only
-    every other call is recorded from then on.
+    at entry, and at return the globals and the function result (`result`: None, "b" or
+    "B" (a boolean or a byte value), "w" or "l", the size of the slot above the arguments).
+    At most `limit` calls are kept, spread over the whole game: when the list fills, every
+    other call is dropped and only every other call is recorded from then on.
 
     `enter(m, raw)` and `leave(m, raw)`, given the argument bytes, read what the arguments
     point to at entry (kept as call["argv"]) and at return (call["out"])."""
@@ -104,10 +170,20 @@ class Capture:
                 call["result"] = m.r32(slot)
             elif self.result == "w":
                 call["result"] = m.r16(slot)
-            elif self.result == "b":
+            elif self.result in ("b", "B"):
                 call["result"] = m.r8(slot)
             self.calls.append(call)
         handle = [uc.hook_add(UC_HOOK_CODE, leave, begin=ret, end=ret)]
+
+
+def zero_bomber_city(m):
+    """Quirk Q18: the computer's Bomber routine at CODE 6 + 0x146C can read a city number
+    from a local it never set (-$a(a6)), so the original depends on stack leftovers there.
+    The engine uses 0; this hook clears the local on entry so the original does the same."""
+    def enter(uc, address, size, _):
+        sp = uc.reg_read(UC_M68K_REG_A7)
+        uc.mem_write(sp - 14, b"\x00\x00")
+    m.uc.hook_add(UC_HOOK_CODE, enter, begin=m.addr(6, 0x146C), end=m.addr(6, 0x146C))
 
 
 class Game:
@@ -118,6 +194,7 @@ class Game:
         self.rec = GameRecorder(self.d)
         self.qd = QuickDraw(self.m)
         self.qd.install()
+        zero_bomber_city(self.m)
         self.decided = False
         self.first_handoff = False
         self.days = 0

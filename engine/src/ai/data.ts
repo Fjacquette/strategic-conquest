@@ -25,6 +25,13 @@ export const SIDE_WORDS = [-0x1c0c, -0x1c0e, -0x1c10, -0x1c12, -0x1c14, -0x1c16,
 
 /** A word per island (16). */
 export const ISLAND_WORDS = -0x1c4e;
+/**
+ * A word per island (island i at index i - 1) subtracted from distances to the island's
+ * centre when the computer picks islands for its Transports. Nothing writes it, so it is
+ * always 0.
+ */
+export const ISLAND_ALLOWANCE = -0x388c;
+
 /** A byte per island (16). */
 export const ISLAND_BYTES = -0x1c5e;
 /** A byte per city (46). */

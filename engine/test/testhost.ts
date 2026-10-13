@@ -12,14 +12,44 @@
  *
  * A production request (code 6) takes the next type from `production`, if any; a request to
  * set a password (code 24) is answered with testPassword(player).
+ *
+ * With `computer` set, the computer opponent plays its players' sides, as in the original
+ * with its routines running: its requests are answered by it (and not logged), and its
+ * planning, new-piece and start-of-game routines run (unlogged). A human player's
+ * production request then also does what the production dialog does to the city: it
+ * becomes the player's and builds the type chosen (Armies if that is a ship and the city is
+ * not next to water), as tools/emu/aigame.py does for the original.
  */
 import { Mem } from "../src/mem.ts";
-import { PIECE_DEFERRED, PIECE_DONE } from "../src/globals.ts";
+import { ARMY, PIECE_DEFERRED, PIECE_DONE, WATER } from "../src/globals.ts";
 import { RequestCode, type Host, type Message, type Reply, type Request } from "../src/host.ts";
 import { setDestination } from "../src/moveops.ts";
+import { inSet, isComputer, terrainAt } from "../src/map.ts";
 import { pieceAt, setState } from "../src/piece.ts";
+import { cityAt, setCityOwner } from "../src/units.ts";
+import { computerHooks, computerRequest } from "../src/ai/opponent.ts";
 
 export type Action = [string, ...number[]];
+
+/** Ships (types 2-6). */
+const SHIPS = 0x7c;
+
+/**
+ * The production dialog's effect on the city of production request `req` (a player's
+ * starting city, or one just captured): the city becomes the player's and builds the type
+ * in the request, or Armies if that is a ship and the city is not next to water.
+ */
+function chooseCityProduction(m: Mem, req: Request): void {
+  const x = (req.rec[5] << 24) >> 24, y = (req.rec[4] << 24) >> 24;
+  const city = cityAt(m, x, y);
+  let coastal = false;
+  for (let cx = x - 1; cx <= x + 1; cx++) {
+    for (let cy = y - 1; cy <= y + 1; cy++) if (terrainAt(m, cx, cy) === WATER) coastal = true;
+  }
+  const ptype = inSet(SHIPS, req.ptype) && !coastal ? ARMY : req.ptype;
+  setCityOwner(m, ARMY, city, req.player);
+  setCityOwner(m, ptype, city, req.player);
+}
 
 /** The password a test controller gives for `player`: a Pascal string in 6 bytes. */
 export function testPassword(player: number): number[] {
@@ -58,11 +88,16 @@ export class TestHost implements Host {
   snapAt = -1;
   private count = 0;
 
+  /** Whether the computer opponent plays its players' sides. */
+  computer = false;
+
   async request(m: Mem, req: Request, reply: Reply): Promise<void> {
+    if (this.computer && isComputer(m, req.player) && computerRequest(m, req, reply)) return;
     if (this.count++ === this.snapAt) this.log.push(["snap", Buffer.from(m.u8).toString("base64")]);
     this.log.push(["req", Array.from(req.rec), this.digest(m)]);
     if (req.code === RequestCode.PASSWORD && req.rec[8] === 1) req.rec.set(testPassword(req.player), 2);
     if (req.code === RequestCode.PRODUCTION && this.production.length > 0) req.ptype = this.production.shift()!;
+    if (req.code === RequestCode.PRODUCTION && this.computer) chooseCityProduction(m, req);
     if (req.code !== 5) return;
     const a = this.actions[this.next++] ?? ["dir", 0, 0];
     const p = pieceAt(req.index);
@@ -111,20 +146,24 @@ export class TestHost implements Host {
     this.log.push(["event", name, data]);
   }
 
-  aiPlan(_m: Mem): void {
-    this.log.push(["aiPlan"]);
+  aiPlan(m: Mem): void {
+    if (this.computer) computerHooks.aiPlan(m);
+    else this.log.push(["aiPlan"]);
   }
 
-  aiNewPiece(_m: Mem, city: number): void {
-    this.log.push(["aiNewPiece", city]);
+  aiNewPiece(m: Mem, city: number): void {
+    if (this.computer) computerHooks.aiNewPiece(m, city);
+    else this.log.push(["aiNewPiece", city]);
   }
 
-  aiNewGame(_m: Mem): void {
-    this.log.push(["aiNewGame"]);
+  aiNewGame(m: Mem): void {
+    if (this.computer) computerHooks.aiNewGame(m);
+    else this.log.push(["aiNewGame"]);
   }
 
-  aiNewSide(_m: Mem): void {
-    this.log.push(["aiNewSide"]);
+  aiNewSide(m: Mem): void {
+    if (this.computer) computerHooks.aiNewSide(m);
+    else this.log.push(["aiNewSide"]);
   }
 
   /** Value returned for the clock. */

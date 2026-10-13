@@ -5,13 +5,14 @@
  */
 import { GLOBALS_SIZE, Mem } from "../../engine/src/mem.ts";
 import {
-  AUTO_PLAY, AUTOSAVE_OFF, CITY_COUNT, COMPUTER_FLAG, DAY, GAME_MODE, GAME_SEED, LOCAL_PLAYER, NET_TURN, SKILL, WATER,
+  AUTO_PLAY, AUTO_PLAY_REQUESTED, AUTOSAVE_OFF, CITY_COUNT, COMPUTER_FLAG, DAY, GAME_MODE, GAME_SEED, LOCAL_PLAYER, NET_TURN, SKILL, WATER,
 } from "../../engine/src/globals.ts";
 import { DayLoop, runDay, setUpControllers } from "../../engine/src/day.ts";
 import { initGlobals } from "../../engine/src/launch.ts";
 import { playerMap, terrainNear } from "../../engine/src/map.ts";
 import { generateMap } from "../../engine/src/mapgen.ts";
 import { newGame } from "../../engine/src/newgame.ts";
+import { toggleAutoPlay } from "../../engine/src/orders.ts";
 import { ownPiecesAt } from "../../engine/src/query.ts";
 import { cityRec } from "../../engine/src/units.ts";
 import { assets } from "./assets.ts";
@@ -140,6 +141,12 @@ function start(): void {
     },
     zoomin: () => zoom(1),
     zoomout: () => zoom(-1),
+    autoplay: () => {
+      const m = host.m;
+      if (!m) return;
+      toggleAutoPlay(m);
+      ui.check("autoplay", m.b(AUTO_PLAY_REQUESTED) !== 0);
+    },
     sound: () => {
       sound.enabled = !sound.enabled;
       if (!sound.enabled) sound.stop();
@@ -207,6 +214,7 @@ async function main(ui: UI, view: MapView, host: BrowserHost, words: Words, star
   view.revealAll = false;
   ui.enable("save", true);
   ui.enable("saveas", true);
+  ui.enable("autoplay", true);
 
   const m = new Mem(new Uint8Array(GLOBALS_SIZE));
   initGlobals(m);

@@ -15,7 +15,7 @@
 import { Mem } from "../../engine/src/mem.ts";
 import {
   ARMY, AUTOSAVE_OFF, BOMBER, CARRIER, DAY, EMPTY, FIGHTER, GAME_MODE, LOCAL_PLAYER, MOVES_LEFT, NET_TURN, OPPONENT_OF,
-  OWN_CITY_CODE, PIECE_DONE, REMOVED, TRANSPORT, WATER,
+  OWN_CITY_CODE, REMOVED, TRANSPORT, WATER,
 } from "../../engine/src/globals.ts";
 import { setUpControllers } from "../../engine/src/day.ts";
 import { type Host, type Message, Reply, Request, RequestCode } from "../../engine/src/host.ts";
@@ -29,6 +29,7 @@ import { enemyAdjacent, foundEnemy, ownPiecesAt, pieceCount } from "../../engine
 import { qdRandom } from "../../engine/src/random.ts";
 import { loadGame, SAVE_SIZE, saveGame } from "../../engine/src/savefile.ts";
 import { cityRec, productionDays } from "../../engine/src/units.ts";
+import { computerHooks, computerRequest } from "../../engine/src/ai/opponent.ts";
 import { GameFile } from "./files.ts";
 import { Input } from "./input.ts";
 import { CH, CW, MapView, RULER_LEFT, RULER_TOP } from "./mapview.ts";
@@ -167,19 +168,11 @@ export class BrowserHost implements Host {
   async request(m: Mem, req: Request, reply: Reply): Promise<void> {
     await this.ui.whenClosed();
     if (isComputer(m, req.player)) {
-      if (req.code === RequestCode.DIRECTION) {
-        // The computer opponent is not ported yet: its pieces stand still.
-        m.setB(PIECE_DONE, 1);
-        reply.dx = 0;
-        reply.dy = 0;
-        return;
-      }
-      if (req.code === RequestCode.PRODUCTION) return;
       if (req.code === RequestCode.TURN_START) {
         this.ui.setTurn(false, null);
         this.redraw(m);
-        return;
       }
+      if (computerRequest(m, req, reply)) return;
     }
     await this.display(m, req, reply);
   }
@@ -531,13 +524,21 @@ export class BrowserHost implements Host {
     }
   }
 
-  aiPlan(_m: Mem): void {}
+  aiPlan(m: Mem): void {
+    computerHooks.aiPlan(m);
+  }
 
-  aiNewPiece(_m: Mem, _city: number): void {}
+  aiNewPiece(m: Mem, city: number): void {
+    computerHooks.aiNewPiece(m, city);
+  }
 
-  aiNewGame(_m: Mem): void {}
+  aiNewGame(m: Mem): void {
+    computerHooks.aiNewGame(m);
+  }
 
-  aiNewSide(_m: Mem): void {}
+  aiNewSide(m: Mem): void {
+    computerHooks.aiNewSide(m);
+  }
 
   dateTime(_m: Mem): number {
     return (Math.floor(Date.now() / 1000) + MAC_EPOCH) >>> 0;

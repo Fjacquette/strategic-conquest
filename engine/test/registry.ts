@@ -3,7 +3,7 @@
  * JSON array; `log` collects host events (requests, messages) for comparison. A routine
  * may return a promise, which the bridge awaits.
  */
-import { Mem } from "../src/mem.ts";
+import { Mem, SCRATCH_RECORDS, scratchRecord } from "../src/mem.ts";
 import { hashFind, hashInsert, hashRemove, topPieceAt } from "../src/hash.ts";
 import { onMap, terrainNear } from "../src/map.ts";
 import { boardingFull, countAt, enemyAdjacent, ownPiecesAt, topIs } from "../src/query.ts";
@@ -28,8 +28,13 @@ import { loadGame, saveGame } from "../src/savefile.ts";
 import { aiPlan } from "../src/ai/plan.ts";
 import { aiNewGame, aiNewSide } from "../src/ai/setup.ts";
 import { aiFocus, aiIslandReview, aiNewPiece, aiProduction, wakeLightTransports } from "../src/ai/production.ts";
-import { aiTransport, transportArrives } from "../src/ai/transports.ts";
-import { clearLine, followOrders, takesOn } from "../src/ai/moves.ts";
+import {
+  aiTransport, bestLanding, islandForArmies, landCount, nearestIsland, transportArrives, transportMove, transportSail,
+} from "../src/ai/transports.ts";
+import { nearestPort, randomSeaTarget, shipGoTo, shipMove } from "../src/ai/ships.ts";
+import { bomberMove, bomberTarget, wakeOtherBombers } from "../src/ai/bombers.ts";
+import { aiMoveChooser } from "../src/ai/chooser.ts";
+import { clearLine, evade, followOrders, takesOn } from "../src/ai/moves.ts";
 import { armyAboard, armyMove, exploreIsland, huntArmies, sendToCity } from "../src/ai/armies.ts";
 import { hypot } from "../src/map.ts";
 import {
@@ -40,6 +45,17 @@ import { Reply, Request } from "../src/host.ts";
 import { TestHost, type Action } from "./testhost.ts";
 
 type Fn = (m: Mem, args: any[], log: unknown[]) => unknown;
+
+/**
+ * A piece record argument: a piece index, or a record copy the original kept on its stack
+ * ({rec: its 14 bytes}), which is placed in a scratch record.
+ */
+function record(m: Mem, arg: number | { rec: number[] }): number {
+  if (typeof arg === "number") return pieceAt(arg);
+  const r = scratchRecord(SCRATCH_RECORDS - 1);
+  m.bytes(r, 14).set(arg.rec);
+  return r;
+}
 
 export const registry: Record<string, Fn> = {
   hashInsert: (m, [table, x, y, idx, ptype]) => hashInsert(m, table, x, y, idx, ptype),
@@ -166,6 +182,34 @@ export const registry: Record<string, Fn> = {
   fighterStep: (m, [p]) => fighterStep(m, pieceAt(p)),
   exploreAround: (m, [p, set, r]) => exploreAround(m, pieceAt(p), set, r),
   fighterBase: (m, [p]) => fighterBase(m, pieceAt(p)),
+  evade: (m, [p, enemy, _dx, _dy, set, n, flag]) => {
+    const d = evade(m, record(m, p), enemy, set, n, !!flag);
+    return [d.dx, d.dy];
+  },
+  shipGoTo: (m, [p, x, y]) => shipGoTo(m, record(m, p), x, y),
+  nearestPort: (m, [p]) => nearestPort(m, record(m, p)),
+  randomSeaTarget: (m, [p]) => randomSeaTarget(m, record(m, p)),
+  shipMove: (m, [_p, idx]) => shipMove(m, idx),
+  islandForArmies: (m, [x, y]) => islandForArmies(m, x, y),
+  landCount: (m, [x, y, island]) => landCount(m, x, y, island),
+  bestLanding: (m, [x, y, island]) => {
+    const d = bestLanding(m, x, y, island);
+    return [d.dx, d.dy];
+  },
+  nearestIsland: (m, [x, y]) => nearestIsland(m, x, y),
+  transportSail: (m, [p, idx]) => transportSail(m, record(m, p), idx),
+  transportMove: (m, [_p, idx]) => transportMove(m, idx),
+  wakeOtherBombers: (m, [idx]) => wakeOtherBombers(m, idx),
+  bomberTarget: (m, [p, idx]) => bomberTarget(m, record(m, p), idx),
+  bomberMove: (m, [_p, _req, idx]) => bomberMove(m, idx),
+  aiMoveChooser: (m, [rec, replyInit]) => {
+    const req = new Request();
+    req.rec.set(rec);
+    const reply = new Reply();
+    reply.buf.set(replyInit.map((v: number) => v & 0xff));
+    const moved = aiMoveChooser(m, req, reply);
+    return [moved ? 1 : 0, reply.dx, reply.dy];
+  },
   wakeTransports: (m) => wakeTransports(m),
   loadGame: async (m, [file, ignore], log) => {
     const host = new TestHost([], log, ignore ?? []);
@@ -179,15 +223,18 @@ export const registry: Record<string, Fn> = {
     host.production = production;
     await startingCities(m, host, player, cityA, cityB);
   },
-  newGame: async (m, [clock, production, ignore], log) => {
+  newGame: async (m, [clock, production, ignore, computer], log) => {
     const host = new TestHost([], log, ignore ?? []);
     host.clock = clock;
     host.production = production;
+    host.computer = !!computer;
     await newGame(m, host);
   },
-  runDay: async (m, [actions, clock, decided, firstHandoff], log) => {
+  runDay: async (m, [actions, clock, decided, firstHandoff, computer, production], log) => {
     const host = new TestHost(actions as Action[], log);
     host.clock = clock;
+    host.computer = !!computer;
+    host.production = production ?? [];
     const loop = new DayLoop();
     loop.decided = !!decided;
     loop.firstHandoff = !!firstHandoff;
