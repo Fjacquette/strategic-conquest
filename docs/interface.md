@@ -82,6 +82,24 @@ or the pieces aboard (Carriers, Transports). A click in the window or a key show
 piece; Return, Enter or a click elsewhere closes it. It opens over the left part of the
 map, or over the right half when the square is in the left half.
 
+## Dragging on the map
+
+A drag on the map (a destination, a patrol, a stack move, a city's destinations) is tracked
+by SelectTarget (`CODE 15 + 0x0004`): a line in XOR mode joins the centres of the square the
+drag started on and the square under the mouse, clipped to the map, and message line 2 shows
+"Distance = N" (squares, the larger of the two offsets). Past an edge of the map's window the
+map scrolls one square at a time. Releasing the button ends the drag on the last square shown,
+and the message line is cleared.
+
+The browser does the same; it scrolls when the pointer is within half a square of the edge
+of the map in view, since a page filling the screen leaves no room past it.
+
+## The computer's turn
+
+The original's computer takes its turn at the speed of the Mac, showing only the moves the
+player can see. In the browser that takes no time, so a turn of the computer's against a
+person lasts at least 0.75 s, with "Enemy Move" shown (not under Auto Play).
+
 ## Menus in single player
 
 Options > Send Message and Options > Battle Summary are disabled in single player
