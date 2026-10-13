@@ -63,7 +63,14 @@ export class MapView {
   inverted: [number, number] | null = null;
   /** A Bomber's blast being shown: its square and radius. */
   blast: { x: number; y: number; radius: number } | null = null;
+  /**
+   * A drag on the map in progress (SelectTarget, CODE 15 + 0x0004): the square it started
+   * on and the square under the pointer, joined by a line drawn in XOR from centre to centre.
+   */
+  dragLine: [number, number, number, number] | null = null;
   scale = 2;
+  /** The game state last drawn. */
+  private last: Mem | null = null;
 
   constructor(canvas: HTMLCanvasElement, rulerTop: HTMLCanvasElement, rulerLeft: HTMLCanvasElement, assets: Assets) {
     this.canvas = canvas;
@@ -211,6 +218,7 @@ export class MapView {
   }
 
   draw(m: Mem): void {
+    this.last = m;
     this.syncIslands(m);
     const px = this.pixels;
     px.fill(COLOR.black);
@@ -224,7 +232,37 @@ export class MapView {
     }
     if (this.blast) this.drawBlast(this.blast.x, this.blast.y, this.blast.radius);
     if (this.inverted) this.invert(this.inverted[0], this.inverted[1]);
+    if (this.dragLine) {
+      const [x0, y0, x1, y1] = this.dragLine;
+      this.xorLine((x0 - 1) * CW + CW / 2, (y0 - 1) * CH + CH / 2, (x1 - 1) * CW + CW / 2, (y1 - 1) * CH + CH / 2);
+    }
     this.ctx.putImageData(px.image, 0, 0);
+  }
+
+  /** Draw the game state last drawn again (after an overlay changes). */
+  refresh(): void {
+    if (this.last) this.draw(this.last);
+  }
+
+  /** A one-pixel line from (x0, y0) to (x1, y1), both ends included, in inverse colors. */
+  private xorLine(x0: number, y0: number, x1: number, y1: number): void {
+    const d = this.pixels.data;
+    const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    for (;;) {
+      if (x0 >= 0 && x0 < W && y0 >= 0 && y0 < H) d[y0 * W + x0] ^= 0x00ffffff;
+      if (x0 === x1 && y0 === y1) return;
+      const e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        x0 += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
   }
 
   /**

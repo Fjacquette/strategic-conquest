@@ -14,7 +14,7 @@
  */
 import { Mem } from "../../engine/src/mem.ts";
 import {
-  ARMY, AUTOSAVE_OFF, BOMBER, CARRIER, DAY, EMPTY, FIGHTER, GAME_MODE, LOCAL_PLAYER, MOVES_LEFT, NET_TURN, OPPONENT_OF,
+  ARMY, AUTO_PLAY, AUTOSAVE_OFF, BOMBER, CARRIER, DAY, EMPTY, FIGHTER, GAME_MODE, LOCAL_PLAYER, MOVES_LEFT, NET_TURN, OPPONENT_OF,
   OWN_CITY_CODE, REMOVED, TRANSPORT, WATER,
 } from "../../engine/src/globals.ts";
 import { setUpControllers } from "../../engine/src/day.ts";
@@ -46,6 +46,12 @@ const FLASH_MS = 300;
 const STEP_MS = 60;
 /** The system beep plays this long before the game goes on. */
 const BEEP_MS = 200;
+/**
+ * The computer's turn lasts at least this long when a person plays against it, so that it
+ * can be seen to have one: in the browser its moves take no time, and the player sees only
+ * those within sight.
+ */
+const COMPUTER_TURN_MS = 750;
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 /** The original's waits are counted in ticks, sixtieths of a second. */
@@ -68,6 +74,8 @@ export class BrowserHost implements Host {
   readonly file: GameFile;
   /** File menu actions waiting for the start of the next day (CODE 1 + 0x1A18). */
   private pending: { save: boolean; resume: Uint8Array | null } = { save: false, resume: null };
+  /** When the computer's turn began (performance.now()), while it lasts. */
+  private computerTurnSince: number | null = null;
 
   constructor(ui: UI, view: MapView, input: Input, words: Words, sound: Sound) {
     this.ui = ui;
@@ -125,8 +133,16 @@ export class BrowserHost implements Host {
     return { bytes, network: bytes[4] === 2 };
   }
 
-  /** CODE 1 + 0x1A18: the File menu actions deferred to the start of the day. */
+  /**
+   * CODE 1 + 0x1A18: the File menu actions deferred to the start of the day. The computer's
+   * turn, the last of the day, ends here; it is given at least COMPUTER_TURN_MS.
+   */
   async dayStart(m: Mem): Promise<void> {
+    if (this.computerTurnSince !== null) {
+      const left = COMPUTER_TURN_MS - (performance.now() - this.computerTurnSince);
+      this.computerTurnSince = null;
+      if (left > 0) await delay(left);
+    }
     if (this.pending.save) {
       this.pending.save = false;
       await this.save(m);
@@ -177,6 +193,7 @@ export class BrowserHost implements Host {
       if (req.code === RequestCode.TURN_START) {
         this.ui.setTurn(false, null);
         this.redraw(m);
+        if (m.b(AUTO_PLAY) === 0) this.computerTurnSince = performance.now();
       }
       if (computerRequest(m, req, reply)) return;
     }

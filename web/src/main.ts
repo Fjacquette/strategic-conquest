@@ -10,7 +10,7 @@ import {
 import { DayLoop, runDay, setUpControllers } from "../../engine/src/day.ts";
 import { type Host } from "../../engine/src/host.ts";
 import { initGlobals } from "../../engine/src/launch.ts";
-import { playerMap, terrainNear } from "../../engine/src/map.ts";
+import { distance, playerMap, terrainNear } from "../../engine/src/map.ts";
 import { generateMap } from "../../engine/src/mapgen.ts";
 import { newGame } from "../../engine/src/newgame.ts";
 import { toggleAutoPlay } from "../../engine/src/orders.ts";
@@ -64,7 +64,17 @@ function start(): void {
   );
   const corner = document.getElementById("corner") as HTMLDivElement;
   const input = new Input();
-  input.attach(view, () => ui.modal);
+  input.attach(view, ui.viewport, () => ui.modal);
+  // A drag shows a line from where it started to the square under the pointer, and the
+  // distance between them on the message line (CODE 15 + 0x0004).
+  let dragging = false;
+  input.onDrag = (from, to) => {
+    view.dragLine = from && to ? [from[0], from[1], to[0], to[1]] : null;
+    view.refresh();
+    if (from && to) ui.setLine(2, `Distance = ${distance(to[0] - from[0], to[1] - from[1])}`);
+    else if (dragging) ui.setLine(2, "");
+    dragging = from !== null;
+  };
   const sound = new Sound(A.sounds);
   const host = new BrowserHost(ui, view, input, words, sound);
   // The game state, for the browser's console and for tests.
