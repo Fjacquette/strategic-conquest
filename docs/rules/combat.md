@@ -74,6 +74,29 @@ With the die's six faces equally likely, the columns give (attacker loses / repe
 attacker wins, in sixths): 1: 6/0/0; 2: 4/2/0; 3: 3/2/1; 4: 2/2/2; 5: 1/2/3; 6: 0/2/4;
 7: 0/1/5.
 
+### Odds at full strength
+
+Attackers down the side, defenders across the top; each cell is the chance, in percent, that
+the attacker wins / is repelled / loses, at full strength, with the defender in the open and
+a defending Submarine spotted (`tools/analysis/combat_odds.py`). The game's generator gives
+each die face 16–18% of the time, so these are good to about a point. "No fight": nothing
+happens; "sub lost": the Submarine is destroyed; "blast": a Bomber blasts instead of fighting.
+
+| Attacker ↓ Defender → | Army | Fighter | Destroyer | Submarine | Carrier | Transport | Battleship | Bomber |
+|---|---|---|---|---|---|---|---|---|
+| **Army** | 33/33/33 | 33/33/33 | 0/0/100 | no fight | 0/0/100 | 17/33/50 | 0/0/100 | 33/33/33 |
+| **Fighter** | 33/33/33 | 33/33/33 | 0/33/67 | 33/33/33 | 0/0/100 | 33/33/33 | 0/0/100 | 50/33/17 |
+| **Destroyer** | 67/33/0 | 67/33/0 | 33/33/33 | 83/17/0 | 17/33/50 | 83/17/0 | 0/33/67 | 67/33/0 |
+| **Submarine** | sub lost | no fight | 83/17/0 | 83/17/0 | 83/17/0 | 83/17/0 | 50/33/17 | no fight |
+| **Carrier** | 83/17/0 | 83/17/0 | 67/33/0 | 67/33/0 | 33/33/33 | 67/33/0 | 17/33/50 | 83/17/0 |
+| **Transport** | can't attack | can't attack | can't attack | can't attack | can't attack | can't attack | can't attack | can't attack |
+| **Battleship** | 83/17/0 | 83/17/0 | 83/17/0 | 83/17/0 | 50/33/17 | 83/17/0 | 33/33/33 | 83/17/0 |
+| **Bomber** | blast | 17/33/50 | blast | blast | blast | blast | blast | 17/33/50 |
+
+A ship defending in a city is attacked at +4 columns (an Army against a Destroyer in port:
+50/33/17). A ship attacking an unspotted Submarine fights as the defender. Lower strength
+(damage, wear) moves the ratio and so the column.
+
 ## 4. Damage to the loser
 
 The loser takes damage determined by the winner. If the damage is at least the loser's
