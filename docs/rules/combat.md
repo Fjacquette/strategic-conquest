@@ -27,10 +27,9 @@ movement code and are documented with movement.
 
 ## 2. Unspotted Submarines strike first
 
-When a ship attacks a Submarine whose state bits (bits 6–7 of byte 12 of its record) are 0,
-the two exchange roles for the fight: the Submarine is resolved as the attacker and the ship
-as the defender. What the state bits track is to be confirmed with movement; "spotted" is
-the likely meaning.
+When a ship attacks a Submarine that is not spotted (bits 6–7 of byte 12 of its record are
+0; see [movement.md](movement.md#exploration-and-spotting)), the two exchange roles for the
+fight: the Submarine is resolved as the attacker and the ship as the defender.
 
 ## 3. The roll
 
@@ -68,8 +67,12 @@ The column is then limited to 1–7.
 | 5 | L | R | R | W | W | W | W |
 | 6 | L | R | W | W | W | W | W |
 
-Example: two strength-1 Armies give R = 10, column 4: the attacker loses on 1–3, is
-repelled on 4–5 and wins on 6.
+Example: two strength-1 Armies give R = 10, column 4: the attacker loses on 1–2, is
+repelled on 3–4 and wins on 5–6.
+
+With the die's six faces equally likely, the columns give (attacker loses / repelled /
+attacker wins, in sixths): 1: 6/0/0; 2: 4/2/0; 3: 3/2/1; 4: 2/2/2; 5: 1/2/3; 6: 0/2/4;
+7: 0/1/5.
 
 ## 4. Damage to the loser
 
