@@ -46,6 +46,9 @@ const FLASH_MS = 300;
 const STEP_MS = 60;
 /** The system beep plays this long before the game goes on. */
 const BEEP_MS = 200;
+/** The locator: a box closing in on a square from this many squares out, a square a step. */
+const LOCATOR_REACH = 5;
+const LOCATOR_STEP_MS = 45;
 /**
  * The computer's turn lasts at least this long when a person plays against it, so that it
  * can be seen to have one: in the browser its moves take no time, and the player sees only
@@ -76,6 +79,8 @@ export class BrowserHost implements Host {
   private pending: { save: boolean; resume: Uint8Array | null } = { save: false, resume: null };
   /** When the computer's turn began (performance.now()), while it lasts. */
   private computerTurnSince: number | null = null;
+  /** The locator is being shown. */
+  private locating = false;
 
   constructor(ui: UI, view: MapView, input: Input, words: Words, sound: Sound) {
     this.ui = ui;
@@ -430,9 +435,38 @@ export class BrowserHost implements Host {
     this.view.reveal(x, y, this.ui.viewport);
   }
 
-  /** Displays > Current Piece: the map back to the square last brought into view. */
-  showCurrent(): void {
-    if (this.shown) this.show(...this.shown);
+  /**
+   * Displays > Current Piece (or the space bar): the map centred on the piece being moved
+   * (else on the square last brought into view), and a box closing in on it twice so it can be
+   * found at a glance. The original only scrolls back to the remembered square, and only when
+   * it is near the edge of the window or out of it.
+   */
+  async showCurrent(): Promise<void> {
+    const m = this.m;
+    if (!m) return;
+    let at = this.shown;
+    if (this.current) {
+      const p = pieceAt(this.current.req.index);
+      at = [pX(m, p), pY(m, p)];
+    }
+    if (!at) return;
+    this.shown = at;
+    this.view.reveal(at[0], at[1], this.ui.viewport, true);
+    if (this.locating) return;
+    this.locating = true;
+    try {
+      for (let pass = 0; pass < 2; pass++) {
+        for (let reach = LOCATOR_REACH; reach >= 0; reach--) {
+          this.view.locator = { x: at[0], y: at[1], reach };
+          this.view.draw(m);
+          await delay(LOCATOR_STEP_MS);
+        }
+      }
+    } finally {
+      this.view.locator = null;
+      this.view.draw(m);
+      this.locating = false;
+    }
   }
 
   /** Displays > Show Piece Info (CODE 16 + 0x0DAC): the square last brought into view, opened. */

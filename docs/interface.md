@@ -68,8 +68,10 @@ is then spotted on the Master is not yet checked.
 
 The routine that scrolls the map to a square (`CODE 13 + 0x0A38`) also remembers it. It
 runs for each piece the player is asked to move, for fights and blasts, and for the
-player's own positions shown during his turn. Displays > Current Piece scrolls back to the
-remembered square; Displays > Show Piece Info (⌘I, `CODE 16 + 0x0DAC`) scrolls back and
+player's own positions shown during his turn. It scrolls only when the square is within three
+squares of the window's edge or outside it, and then so the square is three squares in from
+that edge. Displays > Current Piece (no key equivalent) scrolls back to the remembered square;
+Displays > Show Piece Info (⌘I, `CODE 16 + 0x0DAC`) scrolls back and
 opens it as a double-click on the map does (`CODE 13 + 0x0028`, `CODE 13 + 0x06FE`):
 nothing on a square the player has not explored, the production dialog on one of his
 cities, and the piece information window where his piece is on top.
@@ -81,6 +83,10 @@ target), whether it has moved today, and fuel (Fighters; Bombers also their blas
 or the pieces aboard (Carriers, Transports). A click in the window or a key shows the next
 piece; Return, Enter or a click elsewhere closes it. It opens over the left part of the
 map, or over the right half when the square is in the left half.
+
+In the browser, Displays > Current Piece (also the space bar) centres the map on the piece
+being moved, or on the remembered square when none is, wherever it is, and a box closes in on
+it twice so it can be found at a glance.
 
 ## Dragging on the map
 

@@ -68,6 +68,8 @@ export class MapView {
    * on and the square under the pointer, joined by a line drawn in XOR from centre to centre.
    */
   dragLine: [number, number, number, number] | null = null;
+  /** A box drawn in XOR round square (x, y), `reach` squares out on each side: the locator. */
+  locator: { x: number; y: number; reach: number } | null = null;
   scale = 2;
   /** The game state last drawn. */
   private last: Mem | null = null;
@@ -232,6 +234,10 @@ export class MapView {
     }
     if (this.blast) this.drawBlast(this.blast.x, this.blast.y, this.blast.radius);
     if (this.inverted) this.invert(this.inverted[0], this.inverted[1]);
+    if (this.locator) {
+      const { x, y, reach } = this.locator;
+      this.xorBox((x - 1 - reach) * CW, (y - 1 - reach) * CH, (x + reach) * CW - 1, (y + reach) * CH - 1);
+    }
     if (this.dragLine) {
       const [x0, y0, x1, y1] = this.dragLine;
       this.xorLine((x0 - 1) * CW + CW / 2, (y0 - 1) * CH + CH / 2, (x1 - 1) * CW + CW / 2, (y1 - 1) * CH + CH / 2);
@@ -242,6 +248,25 @@ export class MapView {
   /** Draw the game state last drawn again (after an overlay changes). */
   refresh(): void {
     if (this.last) this.draw(this.last);
+  }
+
+  /** A two-pixel frame from (x0, y0) to (x1, y1) (inner corners included), in inverse colors. */
+  private xorBox(x0: number, y0: number, x1: number, y1: number): void {
+    const d = this.pixels.data;
+    const flip = (x: number, y: number) => {
+      if (x >= 0 && x < W && y >= 0 && y < H) d[y * W + x] ^= 0x00ffffff;
+    };
+    for (let t = 0; t < 2; t++) {
+      const l = x0 + t, r = x1 - t, top = y0 + t, b = y1 - t;
+      for (let x = l; x <= r; x++) {
+        flip(x, top);
+        flip(x, b);
+      }
+      for (let y = top + 1; y < b; y++) {
+        flip(l, y);
+        flip(r, y);
+      }
+    }
   }
 
   /** A one-pixel line from (x0, y0) to (x1, y1), both ends included, in inverse colors. */
@@ -416,16 +441,16 @@ export class MapView {
   }
 
   /** Scroll the viewport so that square (x, y) is in view, away from the edges. */
-  reveal(x: number, y: number, viewport: HTMLElement): void {
+  reveal(x: number, y: number, viewport: HTMLElement, center = false): void {
     const s = this.scale;
     const px = this.canvas.offsetLeft + (x - 1) * CW * s, py = this.canvas.offsetTop + (y - 1) * CH * s;
     const marginX = CW * s * 3, marginY = CH * s * 3;
     const left = RULER_LEFT * s, top = RULER_TOP * s;
     const { scrollLeft, scrollTop, clientWidth, clientHeight } = viewport;
-    if (px < scrollLeft + left + marginX || px > scrollLeft + clientWidth - marginX) {
+    if (center || px < scrollLeft + left + marginX || px > scrollLeft + clientWidth - marginX) {
       viewport.scrollLeft = px - (clientWidth + left) / 2;
     }
-    if (py < scrollTop + top + marginY || py > scrollTop + clientHeight - marginY) {
+    if (center || py < scrollTop + top + marginY || py > scrollTop + clientHeight - marginY) {
       viewport.scrollTop = py - (clientHeight + top) / 2;
     }
   }

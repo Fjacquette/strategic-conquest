@@ -101,6 +101,11 @@ function start(): void {
     if (ui.modal || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === "+" || e.key === "=") zoom(1);
     if (e.key === "-" || e.key === "_") zoom(-1);
+    if (e.key === " ") {
+      // Displays > Current Piece; the space bar must not also press a focused button.
+      e.preventDefault();
+      void host.showCurrent();
+    }
   });
 
   // The game starts from the setup dialog, or from a saved game chosen while it is shown.
